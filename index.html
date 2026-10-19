@@ -191,7 +191,7 @@
     </div>
   </nav>
 
-  <!-- Modal: Scanner (iOS確実描画版) -->
+  <!-- Modal: Scanner (映像取得安定化版) -->
   <div id="scanModal" class="fixed inset-0 z-50 bg-black/80 flex flex-col justify-end hidden">
     <div id="screenLightOverlay" class="fixed inset-0 bg-white pointer-events-none opacity-0 transition-opacity z-10"></div>
 
@@ -471,7 +471,7 @@
     ];
 
     // --- 2. Database Initialization (Dexie.js) ---
-    const db = new Dexie("PlamoPaintDB_v8");
+    const db = new Dexie("PlamoPaintDB_v9");
     db.version(1).stores({
       paints: "++id, jan, maker, code, name, category, count, location, updatedAt",
       recipes: "++id, kit, formula, note, createdAt",
@@ -802,7 +802,7 @@
       `).join("");
     }
 
-    // --- 8. Native Direct Camera Scanner (iOS playsinline完全準拠) ---
+    // --- 8. Native Direct Camera Scanner (イベント駆動型) ---
     async function openScanModal() {
       document.getElementById("scanModal").classList.remove("hidden");
       document.getElementById("lastScannedBox").classList.add("hidden");
@@ -820,28 +820,30 @@
       stopCameraStream();
       const video = document.getElementById("videoElement");
 
-      // iOS Safariの黒画面を防ぐ必須3属性
       video.setAttribute("autoplay", "");
       video.setAttribute("muted", "");
       video.setAttribute("playsinline", "");
 
-      // 確実な背面カメラの起動制約
       const constraints = {
         audio: false,
         video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: { ideal: "environment" }
         }
       };
 
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = mediaStream;
-        await video.play();
 
-        // 映像再生開始後にスキャンループを起動
-        startBarcodeLoop();
+        // videoのメタデータ準備完了を待ってから再生し、スキャンを開始する
+        video.onloadedmetadata = async () => {
+          try {
+            await video.play();
+            startBarcodeLoop();
+          } catch (playErr) {
+            console.warn("video.play() was deferred:", playErr);
+          }
+        };
       } catch (err) {
         console.error("Camera getUserMedia error:", err);
         alert("カメラの映像取得に失敗しました。\n・Safariの設定でカメラが許可されているか確認してください\n・一度ブラウザを再起動してください");
@@ -870,12 +872,9 @@
       const canvas = document.getElementById("scanCanvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
-      // iOS17以降標準のネイティブBarcodeDetector、またはZXingフォールバック
       if ('BarcodeDetector' in window) {
         barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8'] });
       }
-
-      const zxingScanner = new Html5Qrcode("reader-hidden" || document.createElement("div"));
 
       scanInterval = setInterval(async () => {
         if (isProcessingFrame || !video.videoWidth || !video.videoHeight) return;
@@ -892,12 +891,10 @@
             }
           }
 
-          // ネイティブ未対応時のCanvas解析
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-          // 画像からバーコードをスキャン
           canvas.toBlob(async (blob) => {
             if (!blob) {
               isProcessingFrame = false;
@@ -910,7 +907,6 @@
                 await onBarcodeDetected(result.decodedText);
               }
             } catch (scanErr) {
-              // スキャン失敗は継続
             } finally {
               isProcessingFrame = false;
             }
@@ -919,7 +915,7 @@
         } catch (e) {
           isProcessingFrame = false;
         }
-      }, 250); // 毎秒4回解析
+      }, 250);
     }
 
     async function onBarcodeDetected(decodedText) {
@@ -927,7 +923,7 @@
       const cleanJan = decodedText.trim();
       const isBatch = document.getElementById("batchScanToggle").checked;
       
-      // 1. Search in user inventory
+      // 1. 在庫一覧から検索
       let existing = await db.paints.where("jan").equals(cleanJan).first();
       if (existing) {
         existing.count += 1;
@@ -939,15 +935,15 @@
         return;
       }
 
-      // 2. Search in custom learned dictionary
+      // 2. 学習済みカスタム辞書から検索
       let dictEntry = await db.customDict.get(cleanJan);
 
-      // 3. Search in built-in Tamiya Master
+      // 3. 内蔵タミヤマスタから検索
       if (!dictEntry) {
         dictEntry = TAMIYA_LP_MASTER.find(p => p.jan === cleanJan);
       }
 
-      // 4. Query Yahoo! API
+      // 4. Yahoo! API 検索
       if (!dictEntry && yahooAppId) {
         const overlay = document.getElementById("apiLoadingOverlay");
         overlay.classList.remove("hidden");
