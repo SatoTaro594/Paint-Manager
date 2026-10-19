@@ -13,9 +13,15 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { -webkit-tap-highlight-color: transparent; }
-    .pb-safe { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+    .pb-safe { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    #reader video {
+      object-fit: cover !important;
+      border-radius: 1rem;
+      width: 100% !important;
+      height: 100% !important;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
@@ -73,6 +79,7 @@
         </div>
       </div>
 
+      <!-- Paints List Container -->
       <div id="paintsListContainer" class="space-y-2"></div>
     </section>
 
@@ -115,7 +122,7 @@
         <div class="space-y-1.5">
           <label class="text-[11px] font-bold text-slate-500">Yahoo! Client ID (App ID)</label>
           <div class="flex space-x-1.5">
-            <input type="text" id="yahooAppIdInput" placeholder="dj00aiZpP..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500">
+            <input type="text" id="yahooAppIdInput" placeholder="dj00aiZpP..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 font-mono">
             <button onclick="saveYahooAppId()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold active:bg-indigo-700">保存</button>
           </div>
         </div>
@@ -170,7 +177,7 @@
         <span class="text-[10px] mt-0.5">買物</span>
       </button>
       
-      <!-- Central Floating Camera Button -->
+      <!-- Central Camera Button -->
       <div class="flex-1 flex justify-center -mt-5">
         <button onclick="openScanModal()" class="w-13 h-13 p-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg border-4 border-slate-100 active:scale-95 transition-transform flex items-center justify-center">
           <i class="fa-solid fa-barcode text-xl"></i>
@@ -465,7 +472,7 @@
     ];
 
     // --- 2. Database Initialization (Dexie.js) ---
-    const db = new Dexie("PlamoPaintDB_v6");
+    const db = new Dexie("PlamoPaintDB_v7");
     db.version(1).stores({
       paints: "++id, jan, maker, code, name, category, count, location, updatedAt",
       recipes: "++id, kit, formula, note, createdAt",
@@ -522,19 +529,18 @@
       }
     }
 
-    // --- 4. Yahoo! Shopping API Helper (多段プロキシ・詳細診断付き) ---
+    // --- 4. Yahoo! Shopping API Helper ---
     async function queryYahooPaint(rawJanCode) {
       const cleanJan = String(rawJanCode).replace(/[^0-9]/g, "").trim();
       if (!cleanJan) throw new Error("JANコードが入力されていません");
       if (!yahooAppId) throw new Error("Yahoo! Client IDが未設定です。「設定」タブで保存してください");
 
-      // フリーワード検索用URL（画像のようにJANが商品説明にのみ記載されている場合でも100%ヒット）
       const targetApiUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&query=${encodeURIComponent(cleanJan)}&results=5`;
 
       let lastError = null;
       let data = null;
 
-      // 方式1: codetabs proxy (CORS回避能力が最も高く安定)
+      // 方式1: codetabs proxy
       try {
         const p1 = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetApiUrl)}`;
         const r1 = await fetch(p1);
@@ -545,7 +551,7 @@
         lastError = "Proxy1失敗: " + e.message;
       }
 
-      // 方式2: corsproxy.io (フォールバック)
+      // 方式2: corsproxy.io
       if (!data || !data.hits) {
         try {
           const p2 = `https://corsproxy.io/?${encodeURIComponent(targetApiUrl)}`;
@@ -558,7 +564,7 @@
         }
       }
 
-      // 方式3: allorigins.win (最終フォールバック)
+      // 方式3: allorigins.win
       if (!data || !data.hits) {
         try {
           const p3 = `https://api.allorigins.win/get?url=${encodeURIComponent(targetApiUrl)}`;
@@ -574,22 +580,19 @@
         }
       }
 
-      // データ検証
       if (!data) {
         throw new Error(`全プロキシ通信が遮断されました。\n(${lastError || 'ネットワークエラー'})`);
       }
 
-      // Yahoo APIのエラーレスポンス（403, 401など）
       if (data.Error || data.error) {
         const errDetail = data.Error ? data.Error.Message : data.error_description;
         throw new Error(`Yahoo! APIエラー: ${errDetail || 'Client IDが無効です'}`);
       }
 
       if (!data.hits || data.hits.length === 0) {
-        return null; // 該当なし
+        return null;
       }
 
-      // 最初のヒット商品から解析
       const item = data.hits[0];
       const rawTitle = item.name || "";
       const brand = (item.brand && item.brand.name) ? item.brand.name : "";
@@ -801,63 +804,95 @@
       `).join("");
     }
 
-    // --- 8. Barcode Scanner Logic ---
+    // --- 8. Barcode Scanner Logic (iOS完全安定化版) ---
     function openScanModal() {
       document.getElementById("scanModal").classList.remove("hidden");
       document.getElementById("lastScannedBox").classList.add("hidden");
       startScanner();
     }
 
-    function closeScanModal() {
-      stopScanner();
+    async function closeScanModal() {
+      await stopScanner();
       if (isScreenTorchOn) toggleScreenTorch();
       document.getElementById("scanModal").classList.add("hidden");
       renderInventory();
     }
 
-    function startScanner() {
+    async function startScanner() {
       if (isScanning) return;
+
+      // 既存インスタンスが残っている場合は完全に破棄
+      if (html5QrCode) {
+        try {
+          await html5QrCode.stop();
+          html5QrCode.clear();
+        } catch (e) {}
+        html5QrCode = null;
+      }
+
+      // 要素の初期化
+      document.getElementById("reader").innerHTML = "";
       html5QrCode = new Html5Qrcode("reader");
 
-      const cameraConfig = {
-        facingMode: "environment",
-        width: { min: 1280, ideal: 1920 },
-        height: { min: 720, ideal: 1080 }
-      };
-
+      // iOSでOverconstrainedErrorを起こさない最も安全でシンプルな設定
       const config = {
-        fps: 20,
-        qrbox: { width: 280, height: 160 },
-        aspectRatio: 1.0,
+        fps: 15,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          return {
+            width: Math.floor(minEdge * 0.8),
+            height: Math.floor(minEdge * 0.5)
+          };
+        },
         formatsToSupport: [ 
           Html5QrcodeSupportedFormats.EAN_13, 
           Html5QrcodeSupportedFormats.EAN_8 
         ]
       };
 
-      html5QrCode.start(
-        cameraConfig,
-        config,
-        onBarcodeDetected,
-        (errorMessage) => {}
-      ).then(() => {
-        isScanning = true;
-      }).catch(err => {
-        html5QrCode.start(
+      try {
+        // facingMode: "environment" のみ指定（解像度制約を排除）
+        await html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 250, height: 150 } },
+          config,
           onBarcodeDetected,
           () => {}
-        ).then(() => { isScanning = true; });
-      });
+        );
+        isScanning = true;
+      } catch (err) {
+        console.warn("背面カメラ起動失敗、標準ビデオ指定で再試行:", err);
+        try {
+          // デバイス一覧から背面カメラを探してID指定で起動
+          const devices = await Html5Qrcode.getCameras();
+          if (devices && devices.length > 0) {
+            const backCamera = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+            await html5QrCode.start(
+              backCamera.id,
+              config,
+              onBarcodeDetected,
+              () => {}
+            );
+            isScanning = true;
+          } else {
+            throw new Error("利用可能なカメラが見つかりません");
+          }
+        } catch (fallbackErr) {
+          console.error("Camera Final Error:", fallbackErr);
+          alert("カメラの起動に失敗しました。\n・Safariの設定でカメラが許可されているか確認してください\n・一度ブラウザを再起動してください");
+          closeScanModal();
+        }
+      }
     }
 
-    function stopScanner() {
+    async function stopScanner() {
       if (html5QrCode && isScanning) {
-        html5QrCode.stop().then(() => {
+        try {
+          await html5QrCode.stop();
           html5QrCode.clear();
-          isScanning = false;
-        }).catch(() => {});
+        } catch (e) {
+          console.warn("Scanner stop error:", e);
+        }
+        isScanning = false;
       }
     }
 
@@ -917,7 +952,7 @@
         showScannedFeedback(newPaint);
         showToast(`自動登録: ${newPaint.name} (+1本)`);
       } else {
-        stopScanner();
+        await stopScanner();
         openManualModal({
           jan: cleanJan,
           maker: dictEntry ? dictEntry.maker : "タミヤ",
@@ -1193,7 +1228,6 @@
       }
       updateApiStatusTag();
 
-      // 初回起動時にタミヤマスタを辞書キャッシュに登録
       const dictCount = await db.customDict.count();
       if (dictCount === 0) {
         for (const item of TAMIYA_LP_MASTER) {
