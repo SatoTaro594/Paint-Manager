@@ -13,13 +13,15 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { -webkit-tap-highlight-color: transparent; }
-    .pb-safe { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+    .pb-safe { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
 
   <!-- Header -->
-  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
     <div class="flex items-center space-x-2">
       <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-inner">
         <i class="fa-solid fa-fill-drip"></i>
@@ -29,15 +31,13 @@
         <p class="text-[10px] text-slate-500 font-medium">在庫・調色・購入支援</p>
       </div>
     </div>
-    <div class="flex items-center space-x-2">
-      <button onclick="openManualModal()" class="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1.5 rounded-lg border border-indigo-200 active:bg-indigo-100">
-        <i class="fa-solid fa-plus mr-1"></i>手動追加
-      </button>
-    </div>
+    <button onclick="openManualModal()" class="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1.5 rounded-lg border border-indigo-200 active:bg-indigo-100">
+      <i class="fa-solid fa-plus mr-1"></i>手動追加
+    </button>
   </header>
 
   <!-- Notification Toast -->
-  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-semibold shadow-lg transition-all duration-300 opacity-0 pointer-events-none">
+  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white px-4 py-2 rounded-full text-xs font-semibold shadow-lg transition-all duration-300 opacity-0 pointer-events-none">
     メッセージ
   </div>
 
@@ -46,11 +46,10 @@
     
     <!-- View 1: Inventory (在庫一覧) -->
     <section id="view-inventory" class="space-y-3">
-      <!-- Search & Filters -->
       <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200/80 space-y-2.5">
         <div class="relative">
           <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
-          <input type="text" id="searchInput" placeholder="品番 (C1, LP-1) や品名で検索..." oninput="renderInventory()"
+          <input type="text" id="searchInput" placeholder="品番 (LP-1, C1) や品名で検索..." oninput="renderInventory()"
             class="w-full bg-slate-50 pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
         
@@ -65,21 +64,17 @@
 
         <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-xs text-slate-500">
           <span id="inventoryCount">全 0 点</span>
-          <div class="flex items-center space-x-2">
-            <select id="sortSelect" onchange="renderInventory()" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
-              <option value="code_asc">品番順</option>
-              <option value="count_desc">数量が多い順</option>
-              <option value="count_asc">残少順</option>
-              <option value="updated_desc">最近更新順</option>
-            </select>
-          </div>
+          <select id="sortSelect" onchange="renderInventory()" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
+            <option value="code_asc">品番順</option>
+            <option value="count_desc">所持数が多い順</option>
+            <option value="count_asc">残少順</option>
+            <option value="updated_desc">最近更新順</option>
+          </select>
         </div>
       </div>
 
-      <!-- Paints List -->
-      <div id="paintsListContainer" class="space-y-2">
-        <!-- Javascript renders items here -->
-      </div>
+      <!-- Paints List Container -->
+      <div id="paintsListContainer" class="space-y-2"></div>
     </section>
 
     <!-- View 2: Shopping List (買い物リスト) -->
@@ -88,12 +83,10 @@
         <i class="fa-solid fa-cart-shopping text-lg mt-0.5 text-amber-600"></i>
         <div class="text-xs">
           <div class="font-bold text-amber-900">補充・購入リスト</div>
-          在庫数が「0本」になった塗料が自動的に並びます。店頭で購入したら「+1」を押してください。
+          在庫数が「0本」になった塗料がここに集約されます。購入時に「購入(+1)」を押してください。
         </div>
       </div>
-      <div id="shoppingListContainer" class="space-y-2">
-        <!-- Javascript renders items here -->
-      </div>
+      <div id="shoppingListContainer" class="space-y-2"></div>
     </section>
 
     <!-- View 3: Recipes (調色レシピ) -->
@@ -104,21 +97,22 @@
           <i class="fa-solid fa-plus mr-1"></i>新規レシピ
         </button>
       </div>
-      <div id="recipesContainer" class="space-y-2">
-        <!-- Javascript renders recipes here -->
-      </div>
+      <div id="recipesContainer" class="space-y-2"></div>
     </section>
 
-    <!-- View 4: Settings & Data Tools (設定・外部連携) -->
+    <!-- View 4: Settings (設定・診断) -->
     <section id="view-settings" class="space-y-3 hidden">
       <!-- Yahoo API Settings Box -->
       <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-        <div class="flex items-center space-x-2 text-indigo-700 font-bold text-sm">
-          <i class="fa-solid fa-cloud-arrow-down"></i>
-          <span>Yahoo!ショッピング API 自動補完設定</span>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2 text-indigo-700 font-bold text-sm">
+            <i class="fa-solid fa-cloud-arrow-down"></i>
+            <span>Yahoo! ショッピング API 設定</span>
+          </div>
+          <span id="apiStatusTag" class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-500">未設定</span>
         </div>
         <p class="text-xs text-slate-600 leading-relaxed">
-          未知のJANコードをスキャンした際、Yahoo!ショッピングから品名・メーカーを自動取得します。LINEヤフーで取得したClient ID（App ID）を登録してください。
+          未知のJANコードをスキャンした際、Yahoo!ショッピングから品名を自動取得します。LINEヤフーで取得したClient ID（App ID）を入力してください。
         </p>
         <div class="space-y-1.5">
           <label class="text-[11px] font-bold text-slate-500">Yahoo! Client ID (App ID)</label>
@@ -127,16 +121,17 @@
             <button onclick="saveYahooAppId()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold active:bg-indigo-700">保存</button>
           </div>
         </div>
+        <button onclick="testYahooApiConnection()" class="w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+          <i class="fa-solid fa-plug mr-1"></i>API接続テスト (クレオス水性ホビーカラーでテスト)
+        </button>
       </div>
 
+      <!-- Backup Box -->
       <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
         <h2 class="text-sm font-bold text-slate-800 flex items-center space-x-2">
           <i class="fa-solid fa-database text-indigo-600"></i>
           <span>データ管理・バックアップ</span>
         </h2>
-        <p class="text-xs text-slate-500 leading-relaxed">
-          データはすべてお使いのスマートフォン内部（IndexedDB）に保存されます。機種変更や友人との共有にエクスポートをご利用ください。
-        </p>
         <div class="grid grid-cols-2 gap-2 pt-1">
           <button onclick="exportDataJSON()" class="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
             <i class="fa-solid fa-download"></i>
@@ -150,15 +145,16 @@
         </div>
       </div>
 
+      <!-- Reset & Reload Master -->
       <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-2">
-        <h3 class="text-xs font-bold text-slate-700">初期化・テスト支援</h3>
-        <button onclick="seedTamiyaDemo()" class="w-full text-left py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 flex justify-between items-center">
-          <span>タミヤラッカー定番5色をサンプル投入</span>
-          <i class="fa-solid fa-chevron-right text-slate-400 text-[10px]"></i>
+        <h3 class="text-xs font-bold text-slate-700">データベース操作</h3>
+        <button onclick="reloadTamiyaMasterPrompt()" class="w-full text-left py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-medium text-sky-800 flex justify-between items-center">
+          <span>タミヤラッカー全85色のマスタを再同期</span>
+          <i class="fa-solid fa-arrows-rotate text-sky-600 text-xs"></i>
         </button>
         <button onclick="clearAllData()" class="w-full text-left py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-medium text-rose-700 flex justify-between items-center">
           <span>全データをリセット</span>
-          <i class="fa-solid fa-trash text-rose-500 text-[10px]"></i>
+          <i class="fa-solid fa-trash text-rose-500 text-xs"></i>
         </button>
       </div>
     </section>
@@ -200,18 +196,23 @@
 
   <!-- Modal: Scanner (スキャナー) -->
   <div id="scanModal" class="fixed inset-0 z-50 bg-black/80 flex flex-col justify-end hidden">
-    <div class="bg-white rounded-t-3xl p-4 max-w-md w-full mx-auto max-h-[92vh] flex flex-col overflow-hidden">
+    <!-- Screen Light Overlay for iPhone -->
+    <div id="screenLightOverlay" class="fixed inset-0 bg-white pointer-events-none opacity-0 transition-opacity z-10"></div>
+
+    <div class="bg-white rounded-t-3xl p-4 max-w-md w-full mx-auto max-h-[92vh] flex flex-col overflow-hidden relative z-20">
       <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div class="flex items-center space-x-2">
           <h2 class="text-sm font-bold text-slate-800">バーコードスキャン</h2>
-          <span id="apiStatusBadge" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">Yahoo!検索: 未設定</span>
+          <button onclick="toggleScreenTorch()" id="torchBtn" class="text-xs bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full text-slate-600 flex items-center space-x-1">
+            <i class="fa-solid fa-lightbulb"></i>
+            <span id="torchLabel">画面ライト</span>
+          </button>
         </div>
         <button onclick="closeScanModal()" class="text-slate-400 text-lg w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <!-- Batch Mode Switch -->
       <div class="flex items-center justify-between py-2 text-xs text-slate-600">
         <span>連続スキャンモード (自動で+1)</span>
         <label class="relative inline-flex items-center cursor-pointer">
@@ -221,28 +222,28 @@
       </div>
 
       <!-- Camera Preview Box -->
-      <div class="relative w-full aspect-square bg-slate-900 rounded-2xl overflow-hidden my-2 flex items-center justify-center">
+      <div class="relative w-full aspect-square bg-slate-900 rounded-2xl overflow-hidden my-1 flex items-center justify-center">
         <div id="reader" class="w-full h-full"></div>
-        <!-- Scan Target Reticle -->
+        <!-- Target Frame -->
         <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
-          <div class="w-3/4 h-32 border-2 border-indigo-400/80 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-            <span class="text-white/80 text-[11px] font-mono tracking-wider drop-shadow">JANコードを枠内に</span>
+          <div class="w-3/4 h-28 border-2 border-indigo-400/80 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+            <span class="text-white/80 text-[11px] font-mono tracking-wider drop-shadow">20cmほど離して枠内へ</span>
           </div>
         </div>
-        <!-- Loading Spinner for API -->
-        <div id="apiLoadingOverlay" class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white space-y-2 hidden">
+        <!-- API Loading Indicator -->
+        <div id="apiLoadingOverlay" class="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white space-y-2 hidden">
           <div class="w-8 h-8 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
-          <span class="text-xs font-semibold">Yahoo!商品情報を照会中...</span>
+          <span class="text-xs font-semibold">Yahoo!で商品情報を検索中...</span>
         </div>
       </div>
 
-      <!-- Last Scanned Live Card -->
-      <div id="lastScannedBox" class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1 hidden">
+      <!-- Feedback Banner -->
+      <div id="lastScannedBox" class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-0.5 hidden">
         <div class="flex justify-between items-center">
-          <span class="font-bold text-slate-700" id="scanResultTitle">塗料名</span>
+          <span class="font-bold text-slate-800" id="scanResultTitle">塗料名</span>
           <span class="text-indigo-600 font-bold" id="scanResultCount">所持: 1本</span>
         </div>
-        <p class="text-[11px] text-slate-500" id="scanResultMeta">C1 / GSIクレオス / ラッカー</p>
+        <p class="text-[11px] text-slate-500" id="scanResultMeta">LP-1 / タミヤ / ラッカー</p>
       </div>
 
       <div class="pt-2 text-center">
@@ -266,18 +267,23 @@
       <form id="paintForm" onsubmit="handleSavePaint(event)" class="space-y-3 pt-3">
         <input type="hidden" id="form-id">
         
-        <!-- Duplicate Alert Banner -->
         <div id="duplicateAlert" class="bg-amber-50 border border-amber-300 text-amber-800 px-3 py-2 rounded-xl text-xs flex items-center justify-between hidden">
           <span id="duplicateAlertText"><i class="fa-solid fa-triangle-exclamation mr-1"></i>すでに在庫に存在します</span>
         </div>
 
         <div>
-          <label class="text-[11px] font-bold text-slate-500">JANコード (バーコード)</label>
+          <label class="text-[11px] font-bold text-slate-500">JANコード (数字)</label>
           <div class="flex space-x-1.5 mt-0.5">
-            <input type="text" id="form-jan" oninput="checkDuplicateJan()" placeholder="4950344..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
-            <button type="button" onclick="triggerYahooSearchFromInput()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold">
-              <i class="fa-solid fa-magnifying-glass mr-1"></i>Yahoo!照会
+            <input type="text" id="form-jan" oninput="checkDuplicateJan()" placeholder="4973028..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 font-mono">
+            <button type="button" onclick="triggerYahooSearchFromInput()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <span>Yahoo!照会</span>
             </button>
+          </div>
+          <!-- Fallback Link for jancode.xyz -->
+          <div class="pt-1 flex justify-between items-center text-[11px]">
+            <span class="text-slate-400">見つからない場合:</span>
+            <a id="externalJanLink" href="#" target="_blank" class="text-blue-600 underline font-medium">jancode.xyz で探す</a>
           </div>
         </div>
 
@@ -288,8 +294,8 @@
               <option value="タミヤ">タミヤ</option>
               <option value="GSIクレオス">GSIクレオス</option>
               <option value="ガイアノーツ">ガイアノーツ</option>
-              <option value="ボーンペイント">ボーンペイント</option>
               <option value="フィニッシャーズ">フィニッシャーズ</option>
+              <option value="ボーンペイント">ボーンペイント</option>
               <option value="その他">その他</option>
             </select>
           </div>
@@ -313,7 +319,7 @@
           </div>
           <div class="col-span-2">
             <label class="text-[11px] font-bold text-slate-500">品名 (Color Name)</label>
-            <input type="text" id="form-name" required placeholder="ホワイト, ジャーマングレイ" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
+            <input type="text" id="form-name" required placeholder="ブラック, ジャーマングレイ" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
           </div>
         </div>
 
@@ -353,15 +359,15 @@
       <form id="recipeForm" onsubmit="handleSaveRecipe(event)" class="space-y-3 pt-3">
         <div>
           <label class="text-[11px] font-bold text-slate-500">作成キット / パーツ名</label>
-          <input type="text" id="recipe-kit" required placeholder="例: RG 1/144 RX-78-2 外装白" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+          <input type="text" id="recipe-kit" required placeholder="例: RG 1/144 外装ホワイト" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
         </div>
         <div>
           <label class="text-[11px] font-bold text-slate-500">配合レシピ</label>
-          <textarea id="recipe-formula" required rows="3" placeholder="・LP-2 ホワイト: 80%&#10;・LP-39 レーシングホワイト: 20%&#10;・下地: オキサイドレッドサフ" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs"></textarea>
+          <textarea id="recipe-formula" required rows="3" placeholder="・LP-2 ホワイト: 80%&#10;・LP-39 レーシングホワイト: 20%" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs"></textarea>
         </div>
         <div>
           <label class="text-[11px] font-bold text-slate-500">希釈・備考</label>
-          <input type="text" id="recipe-note" placeholder="レベリングうすめ液で 1 : 1.5希釈" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+          <input type="text" id="recipe-note" placeholder="うすめ液で 1 : 1.5希釈" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
         </div>
         <div class="pt-2 flex space-x-2">
           <button type="button" onclick="closeRecipeModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600">キャンセル</button>
@@ -371,10 +377,99 @@
     </div>
   </div>
 
-  <!-- APPLICATION LOGIC -->
+  <!-- APPLICATION JAVASCRIPT -->
   <script>
-    // --- 1. Database Initialization (Dexie.js) ---
-    const db = new Dexie("PlamoPaintDB_v2");
+    // --- 1. 内蔵マスターデータ（タミヤラッカー全85色完全収録） ---
+    const TAMIYA_LP_MASTER = [
+      {jan:"4950344813018", maker:"タミヤ", code:"LP-1", name:"ブラック", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813025", maker:"タミヤ", code:"LP-2", name:"ホワイト", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813032", maker:"タミヤ", code:"LP-3", name:"フラットブラック", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813049", maker:"タミヤ", code:"LP-4", name:"フラットホワイト", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813056", maker:"タミヤ", code:"LP-5", name:"セミグロスブラック", category:"ラッカー", gloss:"半光沢"},
+      {jan:"4950344813063", maker:"タミヤ", code:"LP-6", name:"ピュアーブルー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813070", maker:"タミヤ", code:"LP-7", name:"ピュアーレッド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813087", maker:"タミヤ", code:"LP-8", name:"ピュアイエロー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813094", maker:"タミヤ", code:"LP-9", name:"クリヤー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813100", maker:"タミヤ", code:"LP-10", name:"ラッカー溶剤", category:"ラッカー", gloss:"溶剤"},
+      {jan:"4950344813117", maker:"タミヤ", code:"LP-11", name:"シルバー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813124", maker:"タミヤ", code:"LP-12", name:"呉海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813131", maker:"タミヤ", code:"LP-13", name:"佐世保海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813148", maker:"タミヤ", code:"LP-14", name:"舞鶴海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813155", maker:"タミヤ", code:"LP-15", name:"横須賀海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813162", maker:"タミヤ", code:"LP-16", name:"木甲板色", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813179", maker:"タミヤ", code:"LP-17", name:"リノリウム甲板色", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813186", maker:"タミヤ", code:"LP-18", name:"ダルレッド", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813193", maker:"タミヤ", code:"LP-19", name:"ガンメタル", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813209", maker:"タミヤ", code:"LP-20", name:"ライトガンメタル", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813216", maker:"タミヤ", code:"LP-21", name:"イタリアンレッド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813223", maker:"タミヤ", code:"LP-22", name:"フラットベース", category:"ラッカー", gloss:"添加剤"},
+      {jan:"4950344813230", maker:"タミヤ", code:"LP-23", name:"フラットクリヤー", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813247", maker:"タミヤ", code:"LP-24", name:"セミグロスクリヤー", category:"ラッカー", gloss:"半光沢"},
+      {jan:"4950344813254", maker:"タミヤ", code:"LP-25", name:"茶色(陸上自衛隊)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813261", maker:"タミヤ", code:"LP-26", name:"濃緑色(陸上自衛隊)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813278", maker:"タミヤ", code:"LP-27", name:"ジャーマングレイ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813285", maker:"タミヤ", code:"LP-28", name:"オリーブドラブ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813292", maker:"タミヤ", code:"LP-29", name:"オリーブドラブ2", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813308", maker:"タミヤ", code:"LP-30", name:"ライトサンド", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813315", maker:"タミヤ", code:"LP-31", name:"暗緑色2(日本海軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813322", maker:"タミヤ", code:"LP-32", name:"明灰白色(日本海軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813339", maker:"タミヤ", code:"LP-33", name:"灰緑色(日本海軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813346", maker:"タミヤ", code:"LP-34", name:"ライトグレイ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813353", maker:"タミヤ", code:"LP-35", name:"インシグニアホワイト", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813360", maker:"タミヤ", code:"LP-36", name:"ダークゴーストグレイ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813377", maker:"タミヤ", code:"LP-37", name:"ライトゴーストグレイ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813384", maker:"タミヤ", code:"LP-38", name:"フラットアルミ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813391", maker:"タミヤ", code:"LP-39", name:"レーシングホワイト", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813407", maker:"タミヤ", code:"LP-40", name:"メタリックブラック", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813414", maker:"タミヤ", code:"LP-41", name:"マイカブルー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813421", maker:"タミヤ", code:"LP-42", name:"マイカレッド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813438", maker:"タミヤ", code:"LP-43", name:"パールホワイト", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813445", maker:"タミヤ", code:"LP-44", name:"メタリックオレンジ", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813452", maker:"タミヤ", code:"LP-45", name:"レーシングブルー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813469", maker:"タミヤ", code:"LP-46", name:"ピュアーメタリックレッド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813476", maker:"タミヤ", code:"LP-47", name:"パールブルー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813483", maker:"タミヤ", code:"LP-48", name:"スパークリングシルバー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813490", maker:"タミヤ", code:"LP-49", name:"パールクリヤー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813506", maker:"タミヤ", code:"LP-50", name:"ブライトレッド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813513", maker:"タミヤ", code:"LP-51", name:"ピュアーオレンジ", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813520", maker:"タミヤ", code:"LP-52", name:"クリヤーレッド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813537", maker:"タミヤ", code:"LP-53", name:"クリヤーオレンジ", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813544", maker:"タミヤ", code:"LP-54", name:"ダークアイアン(履帯色)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813551", maker:"タミヤ", code:"LP-55", name:"ダークイエロー2(ドイツ陸軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813568", maker:"タミヤ", code:"LP-56", name:"ダークグリーン2(ドイツ陸軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813575", maker:"タミヤ", code:"LP-57", name:"レッドブラウン2(ドイツ陸軍)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813582", maker:"タミヤ", code:"LP-58", name:"NATOグリーン", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813599", maker:"タミヤ", code:"LP-59", name:"NATOブラウン", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813605", maker:"タミヤ", code:"LP-60", name:"NATOブラック", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813612", maker:"タミヤ", code:"LP-61", name:"メタリックグレイ", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813629", maker:"タミヤ", code:"LP-62", name:"チタンゴールド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813636", maker:"タミヤ", code:"LP-63", name:"チタンシルバー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813643", maker:"タミヤ", code:"LP-64", name:"OD色(陸上自衛隊)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813650", maker:"タミヤ", code:"LP-65", name:"ラバーブラック", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813667", maker:"タミヤ", code:"LP-66", name:"フラットフレッシュ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813674", maker:"タミヤ", code:"LP-67", name:"スモーク", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813681", maker:"タミヤ", code:"LP-68", name:"クリヤーブルー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813698", maker:"タミヤ", code:"LP-69", name:"クリヤーイエロー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813704", maker:"タミヤ", code:"LP-70", name:"アルミシルバー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813711", maker:"タミヤ", code:"LP-71", name:"シャンパンゴールド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813728", maker:"タミヤ", code:"LP-72", name:"マイカシルバー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813735", maker:"タミヤ", code:"LP-73", name:"カーキ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813742", maker:"タミヤ", code:"LP-74", name:"フラットアース", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813759", maker:"タミヤ", code:"LP-75", name:"バフ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813766", maker:"タミヤ", code:"LP-76", name:"イエローブラウン(DAK 1941〜)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813773", maker:"タミヤ", code:"LP-77", name:"ライトブラウン(DAK 1942〜)", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813780", maker:"タミヤ", code:"LP-78", name:"フラットブルー", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813797", maker:"タミヤ", code:"LP-79", name:"フラットレッド", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813803", maker:"タミヤ", code:"LP-80", name:"フラットイエロー", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813810", maker:"タミヤ", code:"LP-81", name:"調色用ブルー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813827", maker:"タミヤ", code:"LP-82", name:"調色用レッド", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813834", maker:"タミヤ", code:"LP-83", name:"調色用イエロー", category:"ラッカー", gloss:"光沢"},
+      {jan:"4950344813841", maker:"タミヤ", code:"LP-84", name:"カモフラージュグレイ", category:"ラッカー", gloss:"つや消し"},
+      {jan:"4950344813858", maker:"タミヤ", code:"LP-85", name:"ミディアムエアーグレイ", category:"ラッカー", gloss:"つや消し"}
+    ];
+
+    // --- 2. Database Initialization (Dexie.js) ---
+    const db = new Dexie("PlamoPaintDB_v3");
     db.version(1).stores({
       paints: "++id, jan, maker, code, name, category, count, location, updatedAt",
       recipes: "++id, kit, formula, note, createdAt",
@@ -384,9 +479,10 @@
     let currentFilterCategory = "ALL";
     let html5QrCode = null;
     let isScanning = false;
+    let isScreenTorchOn = false;
     let yahooAppId = localStorage.getItem("YAHOO_APP_ID") || "";
 
-    // --- Audio Feedback ---
+    // Audio Feedback
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep(freq = 880, duration = 0.1) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -407,62 +503,114 @@
       const t = document.getElementById("toast");
       t.textContent = msg;
       t.classList.remove("opacity-0", "pointer-events-none");
-      setTimeout(() => t.classList.add("opacity-0", "pointer-events-none"), 2200);
+      setTimeout(() => t.classList.add("opacity-0", "pointer-events-none"), 2400);
     }
 
-    // --- 2. Yahoo! Shopping API Helper ---
-    async function queryYahooPaint(janCode) {
+    // --- 3. Screen Torch (iPhone Safari Screen Light) ---
+    function toggleScreenTorch() {
+      const overlay = document.getElementById("screenLightOverlay");
+      const label = document.getElementById("torchLabel");
+      const btn = document.getElementById("torchBtn");
+
+      isScreenTorchOn = !isScreenTorchOn;
+      if (isScreenTorchOn) {
+        overlay.classList.remove("opacity-0");
+        overlay.classList.add("opacity-95");
+        label.textContent = "ライト点灯中";
+        btn.classList.add("bg-amber-100", "text-amber-800", "border-amber-300");
+      } else {
+        overlay.classList.remove("opacity-95");
+        overlay.classList.add("opacity-0");
+        label.textContent = "画面ライト";
+        btn.classList.remove("bg-amber-100", "text-amber-800", "border-amber-300");
+      }
+    }
+
+    // --- 4. Yahoo! Shopping API Helper (Robust Proxy Chain) ---
+    async function queryYahooPaint(rawJanCode) {
+      const cleanJan = String(rawJanCode)
+        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+        .replace(/[^0-9]/g, "")
+        .trim();
+
+      if (!cleanJan) return null;
       if (!yahooAppId) return null;
+
       const overlay = document.getElementById("apiLoadingOverlay");
-      overlay.classList.remove("hidden");
+      if (overlay) overlay.classList.remove("hidden");
 
+      const apiUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&jan_code=${encodeURIComponent(cleanJan)}&results=3`;
+      
+      let data = null;
+
+      // Try Proxy 1: corsproxy.io
       try {
-        const targetUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&jan_code=${encodeURIComponent(janCode)}&results=1`;
-        // CORS proxy
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-        
-        const res = await fetch(proxyUrl);
-        const data = await res.json();
-        
-        if (data.hits && data.hits.length > 0) {
-          const item = data.hits[0];
-          const rawTitle = item.name || "";
-          
-          let maker = "その他";
-          if (rawTitle.includes("クレオス") || rawTitle.includes("Mr.")) maker = "GSIクレオス";
-          else if (rawTitle.includes("タミヤ")) maker = "タミヤ";
-          else if (rawTitle.includes("ガイア")) maker = "ガイアノーツ";
+        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(apiUrl)}`, { cache: "no-store" });
+        if (res.ok) data = await res.json();
+      } catch (e) {
+        console.warn("Proxy 1 (corsproxy) failed:", e);
+      }
 
-          let category = "その他";
-          if (rawTitle.includes("水性") || rawTitle.includes("アクリル")) category = "水性";
-          else if (rawTitle.includes("ラッカー") || rawTitle.includes("Mr.カラー") || rawTitle.includes("LP-")) category = "ラッカー";
-          else if (rawTitle.includes("エナメル")) category = "エナメル";
-          else if (rawTitle.includes("サーフェイサー") || rawTitle.includes("サフ")) category = "サフ";
-
-          // 品番抽出 (C1, LP-1, H-1 など)
-          let code = "";
-          const codeMatch = rawTitle.match(/\b([A-Z]{1,3}[-_]?\d{1,4}[A-Z]?)\b/);
-          if (codeMatch) code = codeMatch[1];
-
-          let cleanName = rawTitle.replace(/【.*?】|\[.*?\]|（.*?）|\(.*?\)|新品|塗料|GSIクレオス|タミヤ/g, "").trim();
-
-          return {
-            jan: janCode,
-            maker,
-            code,
-            name: cleanName || rawTitle,
-            category
-          };
+      // Try Proxy 2: allorigins.win (fallback)
+      if (!data || !data.hits) {
+        try {
+          const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`, { cache: "no-store" });
+          if (res2.ok) data = await res2.json();
+        } catch (e) {
+          console.warn("Proxy 2 (allorigins) failed:", e);
         }
-      } catch (err) {
-        console.warn("Yahoo API lookup failed:", err);
-      } finally {
-        overlay.classList.add("hidden");
+      }
+
+      if (overlay) overlay.classList.add("hidden");
+
+      if (data && data.hits && data.hits.length > 0) {
+        const item = data.hits[0];
+        const rawTitle = item.name || "";
+        const brand = (item.brand && item.brand.name) ? item.brand.name : "";
+
+        let maker = "その他";
+        if (rawTitle.includes("クレオス") || rawTitle.includes("Mr.") || brand.includes("クレオス")) maker = "GSIクレオス";
+        else if (rawTitle.includes("タミヤ") || brand.includes("タミヤ") || rawTitle.includes("TAMIYA")) maker = "タミヤ";
+        else if (rawTitle.includes("ガイア") || brand.includes("ガイア")) maker = "ガイアノーツ";
+
+        let category = "その他";
+        if (/水性|アクリル|アクリジョン/.test(rawTitle)) category = "水性";
+        else if (/ラッカー|Mr\.カラー|LP-/.test(rawTitle)) category = "ラッカー";
+        else if (/エナメル/.test(rawTitle)) category = "エナメル";
+        else if (/サフ|サーフェイサー|プライマー/.test(rawTitle)) category = "サフ";
+
+        let code = "";
+        const codeMatch = rawTitle.match(/\b([A-Z]{1,3}[-_]?\d{1,4}[A-Z]?)\b/);
+        if (codeMatch) code = codeMatch[1];
+
+        let cleanName = rawTitle
+          .replace(/【.*?】|\[.*?\]|（.*?）|\(.*?\)/g, "")
+          .replace(/新品|塗料|GSIクレオス|タミヤ|模型用|プラモデル/g, "")
+          .trim();
+
+        return {
+          jan: cleanJan,
+          maker,
+          code,
+          name: cleanName || rawTitle,
+          category
+        };
       }
       return null;
     }
 
-    // --- 3. View Routing ---
+    async function testYahooApiConnection() {
+      if (!yahooAppId) return alert("先にYahoo! Client IDを入力して「保存」してください。");
+      showToast("API接続テスト中 (水性ホビーカラー H-1)...");
+      const res = await queryYahooPaint("4973028943184");
+      if (res && res.name) {
+        alert(`API通信成功！\n取得結果:\nメーカー: ${res.maker}\n品番: ${res.code}\n品名: ${res.name}\n種別: ${res.category}`);
+      } else {
+        alert("API照会に失敗しました。\n・Client IDが正しいか確認してください\n・ネットワーク環境をご確認ください");
+      }
+    }
+
+    // --- 5. View Routing ---
     function switchTab(tab) {
       ["inventory", "shopping", "recipes", "settings"].forEach(t => {
         document.getElementById(`view-${t}`).classList.add("hidden");
@@ -481,18 +629,16 @@
       if (tab === "recipes") renderRecipes();
     }
 
-    // --- 4. Inventory Rendering ---
+    // --- 6. Inventory Rendering ---
     async function renderInventory() {
       const q = document.getElementById("searchInput").value.trim().toLowerCase();
       const sort = document.getElementById("sortSelect").value;
       let items = await db.paints.toArray();
 
-      // Category filter
       if (currentFilterCategory !== "ALL") {
         items = items.filter(i => i.category === currentFilterCategory);
       }
 
-      // Keyword search
       if (q) {
         items = items.filter(i => 
           (i.name && i.name.toLowerCase().includes(q)) ||
@@ -502,16 +648,19 @@
         );
       }
 
-      // Sorting
       items.sort((a, b) => {
-        if (sort === "code_asc") return (a.code || "").localeCompare(b.code || "");
+        if (sort === "code_asc") {
+          const numA = parseInt((a.code || "").replace(/\D/g, "")) || 0;
+          const numB = parseInt((b.code || "").replace(/\D/g, "")) || 0;
+          return numA !== numB ? numA - numB : (a.code || "").localeCompare(b.code || "");
+        }
         if (sort === "count_desc") return b.count - a.count;
         if (sort === "count_asc") return a.count - b.count;
         if (sort === "updated_desc") return (b.updatedAt || 0) - (a.updatedAt || 0);
         return 0;
       });
 
-      document.getElementById("inventoryCount").textContent = `表示中: ${items.length} 点`;
+      document.getElementById("inventoryCount").textContent = `全 ${items.length} 点`;
 
       const listEl = document.getElementById("paintsListContainer");
       if (items.length === 0) {
@@ -525,7 +674,7 @@
 
       listEl.innerHTML = items.map(item => `
         <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
-          <div class="flex-1 min-w-0 pr-3">
+          <div class="flex-1 min-w-0 pr-2">
             <div class="flex items-center space-x-1.5 mb-0.5">
               ${item.code ? `<span class="bg-slate-900 text-white font-mono text-[10px] font-bold px-1.5 py-0.5 rounded">${escapeHtml(item.code)}</span>` : ''}
               <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ${getCategoryBadgeStyle(item.category)}">${item.category || 'その他'}</span>
@@ -576,7 +725,7 @@
       const newCount = Math.max(0, item.count + delta);
       await db.paints.update(id, { count: newCount, updatedAt: Date.now() });
       renderInventory();
-      if (document.getElementById("view-shopping").classList.contains("hidden") === false) {
+      if (!document.getElementById("view-shopping").classList.contains("hidden")) {
         renderShopping();
       }
     }
@@ -592,7 +741,7 @@
       }
     }
 
-    // --- 5. Shopping List Rendering ---
+    // --- 7. Shopping List Rendering ---
     async function renderShopping() {
       const items = await db.paints.where("count").equals(0).toArray();
       const container = document.getElementById("shoppingListContainer");
@@ -623,16 +772,16 @@
       `).join("");
     }
 
-    // --- 6. Barcode Scanner Logic ---
+    // --- 8. Barcode Scanner Logic ---
     function openScanModal() {
       document.getElementById("scanModal").classList.remove("hidden");
       document.getElementById("lastScannedBox").classList.add("hidden");
-      document.getElementById("apiStatusBadge").textContent = yahooAppId ? "Yahoo!自動取得: ON" : "Yahoo!自動取得: 未設定";
       startScanner();
     }
 
     function closeScanModal() {
       stopScanner();
+      if (isScreenTorchOn) toggleScreenTorch();
       document.getElementById("scanModal").classList.add("hidden");
       renderInventory();
     }
@@ -642,7 +791,7 @@
       html5QrCode = new Html5Qrcode("reader");
       const config = {
         fps: 15,
-        qrbox: { width: 250, height: 160 },
+        qrbox: { width: 260, height: 160 },
         formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8 ]
       };
 
@@ -670,11 +819,11 @@
 
     async function onBarcodeDetected(decodedText) {
       playBeep(920, 0.12);
-      
+      const cleanJan = decodedText.trim();
       const isBatch = document.getElementById("batchScanToggle").checked;
       
-      // 1. Search in local inventory
-      let existing = await db.paints.where("jan").equals(decodedText).first();
+      // 1. Search in local user inventory
+      let existing = await db.paints.where("jan").equals(cleanJan).first();
       if (existing) {
         existing.count += 1;
         existing.updatedAt = Date.now();
@@ -686,20 +835,24 @@
       }
 
       // 2. Search in custom learned dictionary
-      let dictEntry = await db.customDict.get(decodedText);
+      let dictEntry = await db.customDict.get(cleanJan);
 
-      // 3. Query Yahoo! Shopping API if not found
+      // 3. Search in built-in Tamiya Master
+      if (!dictEntry) {
+        dictEntry = TAMIYA_LP_MASTER.find(p => p.jan === cleanJan);
+      }
+
+      // 4. Query Yahoo! Shopping API if still unknown
       if (!dictEntry && yahooAppId) {
-        dictEntry = await queryYahooPaint(decodedText);
+        dictEntry = await queryYahooPaint(cleanJan);
         if (dictEntry) {
-          await db.customDict.put(dictEntry); // Cache to custom dictionary
+          await db.customDict.put(dictEntry);
         }
       }
 
       if (isBatch && dictEntry) {
-        // Automatically add if recognized
         const newPaint = {
-          jan: decodedText,
+          jan: cleanJan,
           maker: dictEntry.maker || "その他",
           code: dictEntry.code || "",
           name: dictEntry.name || "不明な塗料",
@@ -712,10 +865,9 @@
         showScannedFeedback(newPaint);
         showToast(`自動登録: ${newPaint.name} (+1本)`);
       } else {
-        // Pause scanning and open manual form
         stopScanner();
         openManualModal({
-          jan: decodedText,
+          jan: cleanJan,
           maker: dictEntry ? dictEntry.maker : "タミヤ",
           code: dictEntry ? dictEntry.code : "",
           name: dictEntry ? dictEntry.name : "",
@@ -732,7 +884,7 @@
       box.classList.remove("hidden");
     }
 
-    // --- 7. Manual Add / Edit Modal ---
+    // --- 9. Manual Add / Edit Modal ---
     function openManualModal(preset = {}) {
       document.getElementById("manualModal").classList.remove("hidden");
       document.getElementById("form-id").value = preset.id || "";
@@ -745,6 +897,7 @@
       document.getElementById("form-location").value = preset.location || "";
       document.getElementById("duplicateAlert").classList.add("hidden");
 
+      updateExternalJanLink(preset.jan || "");
       if (preset.jan) checkDuplicateJan();
     }
 
@@ -752,9 +905,17 @@
       document.getElementById("manualModal").classList.add("hidden");
     }
 
+    function updateExternalJanLink(jan) {
+      const link = document.getElementById("externalJanLink");
+      const clean = jan.replace(/[^0-9]/g, "").trim();
+      link.href = clean ? `https://www.jancode.xyz/code/?q=${clean}` : "https://www.jancode.xyz/";
+    }
+
     async function checkDuplicateJan() {
       const jan = document.getElementById("form-jan").value.trim();
       const currentId = document.getElementById("form-id").value;
+      updateExternalJanLink(jan);
+
       if (!jan) {
         document.getElementById("duplicateAlert").classList.add("hidden");
         return;
@@ -775,9 +936,21 @@
     async function triggerYahooSearchFromInput() {
       const jan = document.getElementById("form-jan").value.trim();
       if (!jan) return alert("JANコードを入力してください");
-      if (!yahooAppId) return alert("「設定」タブでYahoo! Client IDを保存してください");
+      
+      // 1. Check built-in Tamiya Master first
+      const localMatch = TAMIYA_LP_MASTER.find(p => p.jan === jan);
+      if (localMatch) {
+        document.getElementById("form-name").value = localMatch.name;
+        document.getElementById("form-maker").value = localMatch.maker;
+        document.getElementById("form-category").value = localMatch.category;
+        document.getElementById("form-code").value = localMatch.code;
+        showToast("タミヤマスタから自動補完しました！");
+        return;
+      }
 
-      showToast("Yahoo! APIに問い合わせ中...");
+      // 2. Query Yahoo API
+      if (!yahooAppId) return alert("「設定」タブでYahoo! Client IDを保存してください");
+      showToast("Yahoo! APIに照会中...");
       const res = await queryYahooPaint(jan);
       if (res) {
         document.getElementById("form-name").value = res.name;
@@ -786,7 +959,7 @@
         if (res.code) document.getElementById("form-code").value = res.code;
         showToast("商品情報を自動入力しました！");
       } else {
-        showToast("該当する商品が見つかりませんでした");
+        alert("Yahoo!ショッピングで該当する塗料が見つかりませんでした。\n下の「jancode.xyzで探す」リンクをお試しください。");
       }
     }
 
@@ -806,9 +979,7 @@
       const count = parseInt(document.getElementById("form-count").value || 0);
       const location = document.getElementById("form-location").value.trim();
 
-      const payload = {
-        jan, maker, category, code, name, count, location, updatedAt: Date.now()
-      };
+      const payload = { jan, maker, category, code, name, count, location, updatedAt: Date.now() };
 
       if (id) {
         await db.paints.update(Number(id), payload);
@@ -818,7 +989,6 @@
         showToast("塗料を新規登録しました");
       }
 
-      // Learn into custom dictionary if JAN is present
       if (jan && name) {
         await db.customDict.put({ jan, maker, code, name, category });
       }
@@ -832,7 +1002,7 @@
       if (item) openManualModal(item);
     }
 
-    // --- 8. Recipe Management ---
+    // --- 10. Recipe Management ---
     function openRecipeModal() {
       document.getElementById("recipeModal").classList.remove("hidden");
     }
@@ -886,12 +1056,33 @@
       }
     }
 
-    // --- 9. Settings, Backup & Yahoo ID ---
+    // --- 11. Settings, Backup & Sync ---
     function saveYahooAppId() {
       const val = document.getElementById("yahooAppIdInput").value.trim();
       yahooAppId = val;
       localStorage.setItem("YAHOO_APP_ID", val);
+      updateApiStatusTag();
       showToast("Yahoo! Client IDを保存しました");
+    }
+
+    function updateApiStatusTag() {
+      const tag = document.getElementById("apiStatusTag");
+      if (yahooAppId) {
+        tag.textContent = "有効 (ON)";
+        tag.className = "text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800";
+      } else {
+        tag.textContent = "未設定";
+        tag.className = "text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-500";
+      }
+    }
+
+    async function reloadTamiyaMasterPrompt() {
+      if (confirm("内蔵のタミヤラッカー全85色を辞書にインポートしますか？")) {
+        for (const item of TAMIYA_LP_MASTER) {
+          await db.customDict.put(item);
+        }
+        showToast("タミヤ全85色の辞書を同期しました！");
+      }
     }
 
     async function exportDataJSON() {
@@ -926,21 +1117,8 @@
       reader.readAsText(file);
     }
 
-    async function seedTamiyaDemo() {
-      const samples = [
-        { jan: "4950344813018", maker: "タミヤ", code: "LP-1", name: "ブラック", category: "ラッカー", count: 2, location: "ラック最上段", updatedAt: Date.now() },
-        { jan: "4950344813025", maker: "タミヤ", code: "LP-2", name: "ホワイト", category: "ラッカー", count: 1, location: "ラック最上段", updatedAt: Date.now() },
-        { jan: "4950344813032", maker: "タミヤ", code: "LP-3", name: "フラットブラック", category: "ラッカー", count: 0, location: "", updatedAt: Date.now() },
-        { jan: "4950344813117", maker: "タミヤ", code: "LP-11", name: "シルバー", category: "ラッカー", count: 1, location: "机引き出し", updatedAt: Date.now() },
-        { jan: "4950344813278", maker: "タミヤ", code: "LP-27", name: "ジャーマングレイ", category: "ラッカー", count: 0, location: "", updatedAt: Date.now() }
-      ];
-      await db.paints.bulkPut(samples);
-      renderInventory();
-      showToast("サンプル5件を登録しました");
-    }
-
     async function clearAllData() {
-      if (confirm("すべての在庫・レシピ・辞書データを削除しますか？")) {
+      if (confirm("すべての在庫・レシピデータを削除しますか？")) {
         await db.paints.clear();
         await db.recipes.clear();
         await db.customDict.clear();
@@ -955,10 +1133,20 @@
     }
 
     // --- On Load ---
-    window.addEventListener("DOMContentLoaded", () => {
+    window.addEventListener("DOMContentLoaded", async () => {
       if (yahooAppId) {
         document.getElementById("yahooAppIdInput").value = yahooAppId;
       }
+      updateApiStatusTag();
+
+      // 初回起動時にタミヤマスタをカスタム辞書へ登録
+      const dictCount = await db.customDict.count();
+      if (dictCount === 0) {
+        for (const item of TAMIYA_LP_MASTER) {
+          await db.customDict.put(item);
+        }
+      }
+
       renderInventory();
     });
   </script>
