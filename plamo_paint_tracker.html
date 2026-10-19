@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>プラモ塗料インベントリ - PaintBox</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="スマホで簡単管理！バーコード読み取り・重複買い防止対応の模型用塗料管理アプリ">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Phosphor Icons (Lightweight SVG icons) -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Dexie.js (IndexedDB Wrapper) -->
+  <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+  <!-- HTML5-QRCode (Barcode Scanner via Web Camera) -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    /* Safe-area insets for notched iPhones and mobile address bar padding */
+    .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+    /* Hide scrollbar for category pills */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    /* Scanner viewport styling */
+    #qr-reader {
+      border: none !important;
+      width: 100% !important;
+    }
+    #qr-reader__scan_region video {
+      object-fit: cover !important;
+      border-radius: 0.75rem;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
+
+  <!-- App Header -->
+  <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 safe-top">
+    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400">
+          <i class="ph-bold ph-paint-brush-broad text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold leading-tight tracking-wide text-white">PaintBox</h1>
+          <p class="text-[11px] text-slate-400">プラモ塗料管理 <span id="headerTotalBadge" class="text-sky-400 font-semibold">(0種)</span></p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="openSettingsModal()" title="設定 / データ管理" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700 transition">
+          <i class="ph-bold ph-gear text-lg"></i>
+        </button>
+        <button onclick="openRegisterModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-medium text-xs shadow-lg shadow-sky-600/20 transition">
+          <i class="ph-bold ph-plus text-sm"></i>
+          <span>手動登録</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-2xl w-full mx-auto p-4 space-y-4">
+
+    <!-- Search & Filter Bar -->
+    <div class="space-y-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="品番 (例: C1, LP-1) または品名・JANコード..." 
+          class="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-9 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+          oninput="renderList()"
+        />
+        <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+          <i class="ph-bold ph-x-circle text-base"></i>
+        </button>
+      </div>
+
+      <!-- Quick Filter Chips -->
+      <div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
+        <button onclick="setFilter('type', 'ALL')" id="filter-type-ALL" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap bg-sky-600 text-white transition">すべて</button>
+        <button onclick="setFilter('type', 'ラッカー')" id="filter-type-ラッカー" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition">ラッカー</button>
+        <button onclick="setFilter('type', '水性')" id="filter-type-水性" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition">水性アクリル</button>
+        <button onclick="setFilter('type', 'エナメル')" id="filter-type-エナメル" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition">エナメル</button>
+        <button onclick="setFilter('maker', 'GSIクレオス')" id="filter-maker-GSIクレオス" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition">クレオス</button>
+        <button onclick="setFilter('maker', 'ガイアノーツ')" id="filter-maker-ガイアノーツ" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition">ガイア</button>
+        <button onclick="setFilter('maker', 'タミヤ')" id="filter-maker-タミヤ" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-400 hover:text-white border border-slate-700 transition">タミヤ</button>
+      </div>
+    </div>
+
+    <!-- Paint Inventory List -->
+    <div id="paintList" class="space-y-2.5 pb-20">
+      <!-- Cards rendered dynamically via JS -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl bg-slate-900/50">
+      <i class="ph-duotone ph-paint-bucket text-5xl text-slate-600 mx-auto mb-3"></i>
+      <h3 class="text-sm font-semibold text-slate-300">塗料が登録されていません</h3>
+      <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">下の「スキャン」ボタンでバーコードを読むか、サンプルデータを読み込んで試してください。</p>
+      <button onclick="seedSampleData()" class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-medium rounded-xl border border-slate-700 transition inline-flex items-center gap-1.5">
+        <i class="ph-bold ph-sparkle"></i>
+        <span>サンプル塗料を5本追加</span>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Floating Sticky Action Dock (Mobile friendly) -->
+  <div class="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent pointer-events-none safe-bottom z-20">
+    <div class="max-w-2xl mx-auto flex items-center justify-center pointer-events-auto">
+      <button 
+        onclick="openScannerModal()" 
+        class="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-95 text-white font-bold rounded-2xl shadow-xl shadow-sky-500/25 flex items-center justify-center gap-2.5 text-sm transition tracking-wide"
+      >
+        <i class="ph-bold ph-barcode text-xl"></i>
+        <span>バーコードをスキャンして検索 / 登録</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: Barcode Scanner -->
+  <div id="scannerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center p-0 sm:p-4 transition-opacity">
+    <div class="bg-slate-900 border border-slate-700 sm:rounded-2xl rounded-t-3xl max-w-lg w-full mx-auto overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+      <!-- Header -->
+      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-scan text-sky-400 text-lg"></i>
+          <span class="text-sm font-bold text-white">JANコードスキャナー</span>
+        </div>
+        <button onclick="closeScannerModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Scanner Body -->
+      <div class="p-4 flex-1 flex flex-col items-center">
+        <div id="qr-reader" class="rounded-xl overflow-hidden bg-black aspect-square max-w-xs w-full relative flex items-center justify-center border border-slate-700">
+          <!-- Video feed mounted here -->
+        </div>
+
+        <p class="text-xs text-slate-400 mt-3 text-center">
+          塗料ボトルのバーコード（JANコード）を枠内に写してください。<br>自動認識して在庫照会または追加を行います。
+        </p>
+
+        <!-- Flashlight / Camera switch buttons -->
+        <div class="flex gap-2 mt-3">
+          <button id="torchToggleBtn" onclick="toggleTorch()" class="hidden px-3 py-1.5 bg-slate-800 text-xs rounded-lg border border-slate-700 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5">
+            <i class="ph-bold ph-flashlight"></i> ライト
+          </button>
+          <button onclick="manualCodePrompt()" class="px-3 py-1.5 bg-slate-800 text-xs rounded-lg border border-slate-700 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5">
+            <i class="ph-bold ph-keyboard"></i> JANコード直接入力
+          </button>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-3 border-t border-slate-800 bg-slate-900 flex justify-end">
+        <button onclick="closeScannerModal()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Paint Register & Edit -->
+  <div id="registerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center p-0 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 sm:rounded-2xl rounded-t-3xl max-w-md w-full mx-auto overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+      
+      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-paint-bucket text-sky-400 text-lg"></i>
+          <span id="registerModalTitle" class="text-sm font-bold text-white">塗料の登録 / 編集</span>
+        </div>
+        <button onclick="closeRegisterModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Form Body -->
+      <form id="paintForm" onsubmit="handleFormSubmit(event)" class="p-4 space-y-3 overflow-y-auto flex-1">
+        <input type="hidden" id="formPaintId">
+
+        <!-- Duplicate warning alert banner (hidden by default) -->
+        <div id="duplicateAlert" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
+          <i class="ph-fill ph-warning-circle text-base flex-shrink-0 mt-0.5 text-amber-400"></i>
+          <div class="flex-1">
+            <p class="font-bold">既に在庫が存在します！</p>
+            <p id="duplicateAlertMsg" class="mt-0.5 text-amber-200/90 text-[11px]"></p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Maker Selection -->
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">メーカー *</label>
+            <select id="formMaker" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
+              <option value="GSIクレオス">GSIクレオス (Mr.カラー)</option>
+              <option value="ガイアノーツ">ガイアノーツ (ガイアカラー)</option>
+              <option value="タミヤ">タミヤ (Tamiya)</option>
+              <option value="シタデル">シタデル (Citadel)</option>
+              <option value="ボーンペイント">ボーンペイント</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+
+          <!-- Paint Type -->
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">塗料種別 *</label>
+            <select id="formType" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
+              <option value="ラッカー">ラッカー (溶剤系)</option>
+              <option value="水性">水性アクリル</option>
+              <option value="エナメル">エナメル</option>
+              <option value="サーフェイサー">下地・サフ</option>
+              <option value="クリアー・コート">コート・トップコート</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <!-- Product Code -->
+          <div class="col-span-1">
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">品番 *</label>
+            <input 
+              type="text" 
+              id="formProductCode" 
+              placeholder="C1, 001" 
+              required
+              onblur="checkDuplicateRealtime()"
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white uppercase focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            >
+          </div>
+
+          <!-- Name -->
+          <div class="col-span-2">
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">品名 / 色名 *</label>
+            <input 
+              type="text" 
+              id="formName" 
+              placeholder="ホワイト (光沢)" 
+              required 
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            >
+          </div>
+        </div>
+
+        <!-- JAN Code -->
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-400 mb-1">JANコード (バーコード)</label>
+          <div class="relative">
+            <input 
+              type="text" 
+              id="formJan" 
+              placeholder="4973028531008 (任意)" 
+              onblur="checkDuplicateRealtime()"
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            >
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">スキャンで自動入力</span>
+          </div>
+        </div>
+
+        <!-- Initial Quantity -->
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-400 mb-1">所持数 (本数)</label>
+          <div class="flex items-center gap-3">
+            <button type="button" onclick="adjustFormQty(-1)" class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-bold hover:bg-slate-700 active:scale-95 text-base flex items-center justify-center">-</button>
+            <input 
+              type="number" 
+              id="formCount" 
+              min="0" 
+              value="1" 
+              required
+              class="w-20 text-center bg-slate-800 border border-slate-700 rounded-xl py-2 text-sm font-bold text-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            >
+            <button type="button" onclick="adjustFormQty(1)" class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-bold hover:bg-slate-700 active:scale-95 text-base flex items-center justify-center">+</button>
+            <span class="text-xs text-slate-400 ml-1">本保有</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="pt-3 border-t border-slate-800 flex gap-2">
+          <button type="button" onclick="closeRegisterModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition">
+            キャンセル
+          </button>
+          <button type="submit" class="flex-1 py-2.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-sky-600/30 transition">
+            保存する
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Settings & Debug/Backup -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center p-0 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 sm:rounded-2xl rounded-t-3xl max-w-md w-full mx-auto overflow-hidden shadow-2xl flex flex-col">
+      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-database text-sky-400 text-lg"></i>
+          <span class="text-sm font-bold text-white">データ管理・バックアップ</span>
+        </div>
+        <button onclick="closeSettingsModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-4">
+        <!-- Seed Sample -->
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-slate-200">サンプル塗料投入</h4>
+            <p class="text-[11px] text-slate-400">主要定番塗料5本を即時インポート</p>
+          </div>
+          <button onclick="seedSampleData()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-sky-300 text-xs font-medium rounded-lg transition">
+            実行
+          </button>
+        </div>
+
+        <!-- Export JSON -->
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-slate-200">JSONエクスポート</h4>
+            <p class="text-[11px] text-slate-400">友人に共有・バックアップ用ファイルを保存</p>
+          </div>
+          <button onclick="exportDataJSON()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs font-medium rounded-lg transition flex items-center gap-1">
+            <i class="ph-bold ph-download-simple"></i> 出力
+          </button>
+        </div>
+
+        <!-- Import JSON -->
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-slate-200">JSONインポート</h4>
+            <p class="text-[11px] text-slate-400">友人から受け取ったデータを復元</p>
+          </div>
+          <label class="cursor-pointer px-3 py-1.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 text-xs font-medium rounded-lg transition flex items-center gap-1">
+            <i class="ph-bold ph-upload-simple"></i> 読込
+            <input type="file" id="importJsonFileInput" accept=".json" class="hidden" onchange="importDataJSON(event)">
+          </label>
+        </div>
+
+        <!-- Wipe All Data -->
+        <div class="p-3 rounded-xl bg-rose-950/20 border border-rose-900/40 flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-rose-300">データ全削除</h4>
+            <p class="text-[11px] text-rose-400/80">端末のIndexedDBを初期化します</p>
+          </div>
+          <button onclick="clearAllData()" class="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-600 active:scale-95 text-white text-xs font-medium rounded-lg transition">
+            全消去
+          </button>
+        </div>
+      </div>
+
+      <div class="p-3 border-t border-slate-800 bg-slate-900">
+        <button onclick="closeSettingsModal()" class="w-full py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Message Box (No native alerts!) -->
+  <div id="toastBox" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 pointer-events-none max-w-sm w-11/12">
+    <div id="toastContent" class="px-4 py-3 rounded-xl shadow-xl border flex items-center gap-2.5 text-xs font-medium">
+      <i id="toastIcon" class="ph-bold ph-check-circle text-base"></i>
+      <span id="toastMsg" class="flex-1"></span>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    /* ========================================================
+       1. Database Initialization via Dexie.js (IndexedDB)
+       ======================================================== */
+    const db = new Dexie("PlamoPaintDB");
+    db.version(1).stores({
+      paints: "++id, maker, productCode, name, type, jan, count, updatedAt"
+    });
+
+    // Master dictionary for auto-filling typical hobby paints when scanning barcode
+    const KNOWN_JAN_CATALOG = {
+      "4973028531008": { maker: "GSIクレオス", productCode: "C1", name: "ホワイト (白)", type: "ラッカー" },
+      "4973028531015": { maker: "GSIクレオス", productCode: "C2", name: "ブラック (黒)", type: "ラッカー" },
+      "4973028531022": { maker: "GSIクレオス", productCode: "C3", name: "レッド (赤)", type: "ラッカー" },
+      "4973028531039": { maker: "GSIクレオス", productCode: "C4", name: "イエロー (黄)", type: "ラッカー" },
+      "4973028531046": { maker: "GSIクレオス", productCode: "C5", name: "ブルー (青)", type: "ラッカー" },
+      "4571180810017": { maker: "ガイアノーツ", productCode: "001", name: "アルティメットホワイト", type: "ラッカー" },
+      "4571180810024": { maker: "ガイアノーツ", productCode: "002", name: "ピュアブラック", type: "ラッカー" },
+      "4571180810314": { maker: "ガイアノーツ", productCode: "031", name: "アルティメットホワイト", type: "ラッカー" },
+      "4950344813018": { maker: "タミヤ", productCode: "X-1", name: "ブラック", type: "エナメル" },
+      "4950344813025": { maker: "タミヤ", productCode: "X-2", name: "ホワイト", type: "エナメル" },
+      "4950344817016": { maker: "タミヤ", productCode: "XF-1", name: "フラットブラック", type: "エナメル" },
+      "4973028535013": { maker: "GSIクレオス", productCode: "H1", name: "水性ホビーカラー ホワイト", type: "水性" },
+      "4973028535020": { maker: "GSIクレオス", productCode: "H2", name: "水性ホビーカラー ブラック", type: "水性" }
+    };
+
+    // State Variables
+    let currentFilterType = 'ALL';
+    let currentFilterMaker = 'ALL';
+    let html5QrScanner = null;
+    let isTorchOn = false;
+
+    /* ========================================================
+       2. UI Feedback Utilities (Audio & Haptics & Toasts)
+       ======================================================== */
+    // Audio synthesizer using Web Audio API (no external sound assets)
+    function playBeep(success = true) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        if (success) {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.12);
+        } else {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.25);
+        }
+      } catch (e) {
+        // AudioContext not allowed without interaction yet, skip gracefully
+      }
+
+      // Vibration Haptics
+      if (navigator.vibrate) {
+        navigator.vibrate(success ? [40, 30, 40] : 120);
+      }
+    }
+
+    function showToast(msg, type = 'success') {
+      const box = document.getElementById('toastBox');
+      const content = document.getElementById('toastContent');
+      const text = document.getElementById('toastMsg');
+      const icon = document.getElementById('toastIcon');
+
+      text.textContent = msg;
+
+      if (type === 'success') {
+        content.className = "px-4 py-3 rounded-xl shadow-xl border flex items-center gap-2.5 text-xs font-semibold bg-emerald-950/90 text-emerald-200 border-emerald-500/40 backdrop-blur-md";
+        icon.className = "ph-bold ph-check-circle text-base text-emerald-400";
+      } else if (type === 'warn') {
+        content.className = "px-4 py-3 rounded-xl shadow-xl border flex items-center gap-2.5 text-xs font-semibold bg-amber-950/90 text-amber-200 border-amber-500/40 backdrop-blur-md";
+        icon.className = "ph-fill ph-warning-circle text-base text-amber-400";
+      } else {
+        content.className = "px-4 py-3 rounded-xl shadow-xl border flex items-center gap-2.5 text-xs font-semibold bg-rose-950/90 text-rose-200 border-rose-500/40 backdrop-blur-md";
+        icon.className = "ph-bold ph-x-circle text-base text-rose-400";
+      }
+
+      box.classList.remove('-translate-y-20', 'opacity-0');
+      box.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        box.classList.remove('translate-y-0', 'opacity-100');
+        box.classList.add('-translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    /* ========================================================
+       3. Barcode Scanner Logic (html5-qrcode)
+       ======================================================== */
+    function openScannerModal() {
+      document.getElementById('scannerModal').classList.remove('hidden');
+      document.getElementById('scannerModal').classList.add('flex');
+      startScanner();
+    }
+
+    function closeScannerModal() {
+      stopScanner();
+      document.getElementById('scannerModal').classList.add('hidden');
+      document.getElementById('scannerModal').classList.remove('flex');
+    }
+
+    async function startScanner() {
+      if (html5QrScanner) {
+        return;
+      }
+
+      html5QrScanner = new Html5Qrcode("qr-reader");
+      const config = {
+        fps: 15,
+        qrbox: { width: 250, height: 160 }, // Horizontal box tailored for barcodes
+        aspectRatio: 1.0,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.UPC_A
+        ]
+      };
+
+      try {
+        await html5QrScanner.start(
+          { facingMode: "environment" },
+          config,
+          onScanSuccess,
+          onScanFailure
+        );
+
+        // Check if torch feature is supported
+        try {
+          const track = html5QrScanner.getRunningTrackCapabilities();
+          if (track && track.torch) {
+            document.getElementById('torchToggleBtn').classList.remove('hidden');
+          }
+        } catch(e) {}
+
+      } catch (err) {
+        console.error("Camera start failed", err);
+        showToast("カメラ起動に失敗しました。権限を確認してください", "error");
+      }
+    }
+
+    async function stopScanner() {
+      if (html5QrScanner) {
+        try {
+          await html5QrScanner.stop();
+          html5QrScanner.clear();
+        } catch (e) {
+          console.error("Stop scanner error", e);
+        }
+        html5QrScanner = null;
+      }
+    }
+
+    async function toggleTorch() {
+      if (!html5QrScanner) return;
+      isTorchOn = !isTorchOn;
+      try {
+        await html5QrScanner.applyVideoConstraints({
+          advanced: [{ torch: isTorchOn }]
+        });
+      } catch (e) {
+        showToast("ライトの切り替えに対応していません", "warn");
+      }
+    }
+
+    function manualCodePrompt() {
+      const code = prompt("バーコード下の数字(JANコード13桁)を入力してください:");
+      if (code && code.trim()) {
+        onScanSuccess(code.trim());
+      }
+    }
+
+    // Handles when a barcode is recognized
+    async function onScanSuccess(decodedText) {
+      playBeep(true);
+      closeScannerModal();
+
+      const janCode = decodedText.trim();
+
+      // Check if this JAN code or product already exists in local DB
+      const existing = await db.paints.where('jan').equals(janCode).first();
+
+      if (existing) {
+        // DUPLICATE FOUND: notify clearly!
+        playBeep(false);
+        showToast(`【重複アラート】既に「${existing.productCode} ${existing.name}」を ${existing.count}本 所持しています！`, "warn");
+        
+        // Auto scroll & filter to this item
+        document.getElementById('searchInput').value = existing.productCode;
+        renderList();
+        return;
+      }
+
+      // Check if it's in our known catalog to autofill
+      let initialData = { jan: janCode, count: 1, maker: "GSIクレオス", type: "ラッカー", productCode: "", name: "" };
+      if (KNOWN_JAN_CATALOG[janCode]) {
+        initialData = { ...initialData, ...KNOWN_JAN_CATALOG[janCode] };
+        showToast(`カタログから塗料情報を取得しました: ${initialData.name}`, "success");
+      } else {
+        showToast(`バーコード読み取り成功 (${janCode})。情報を入力してください`, "success");
+      }
+
+      openRegisterModal(initialData);
+    }
+
+    function onScanFailure(error) {
+      // Periodic scan misses are normal; no-op
+    }
+
+    /* ========================================================
+       4. Paint Registration, Duplication Checking & Editing
+       ======================================================== */
+    function openRegisterModal(preload = null) {
+      document.getElementById('registerModal').classList.remove('hidden');
+      document.getElementById('registerModal').classList.add('flex');
+      document.getElementById('duplicateAlert').classList.add('hidden');
+
+      if (preload && preload.id) {
+        // Edit existing
+        document.getElementById('registerModalTitle').innerText = "塗料情報の編集";
+        document.getElementById('formPaintId').value = preload.id;
+        document.getElementById('formMaker').value = preload.maker;
+        document.getElementById('formType').value = preload.type;
+        document.getElementById('formProductCode').value = preload.productCode;
+        document.getElementById('formName').value = preload.name;
+        document.getElementById('formJan').value = preload.jan || '';
+        document.getElementById('formCount').value = preload.count;
+      } else {
+        // New Registration
+        document.getElementById('registerModalTitle').innerText = "塗料の登録";
+        document.getElementById('formPaintId').value = "";
+        document.getElementById('formMaker').value = (preload && preload.maker) || "GSIクレオス";
+        document.getElementById('formType').value = (preload && preload.type) || "ラッカー";
+        document.getElementById('formProductCode').value = (preload && preload.productCode) || "";
+        document.getElementById('formName').value = (preload && preload.name) || "";
+        document.getElementById('formJan').value = (preload && preload.jan) || "";
+        document.getElementById('formCount').value = (preload && preload.count !== undefined) ? preload.count : 1;
+      }
+    }
+
+    function closeRegisterModal() {
+      document.getElementById('registerModal').classList.add('hidden');
+      document.getElementById('registerModal').classList.remove('flex');
+      document.getElementById('paintForm').reset();
+    }
+
+    function adjustFormQty(delta) {
+      const input = document.getElementById('formCount');
+      let val = parseInt(input.value || 0, 10) + delta;
+      if (val < 0) val = 0;
+      input.value = val;
+    }
+
+    // Realtime check when typing productCode or JAN in form
+    async function checkDuplicateRealtime() {
+      const id = document.getElementById('formPaintId').value;
+      const maker = document.getElementById('formMaker').value;
+      const code = document.getElementById('formProductCode').value.trim().toUpperCase();
+      const jan = document.getElementById('formJan').value.trim();
+
+      if (!code && !jan) {
+        document.getElementById('duplicateAlert').classList.add('hidden');
+        return;
+      }
+
+      let matches = [];
+      if (jan) {
+        matches = await db.paints.where('jan').equals(jan).toArray();
+      }
+      if (matches.length === 0 && code) {
+        matches = await db.paints
+          .where('productCode')
+          .equalsIgnoreCase(code)
+          .filter(p => p.maker === maker)
+          .toArray();
+      }
+
+      // Filter out self if updating
+      if (id) {
+        matches = matches.filter(m => String(m.id) !== String(id));
+      }
+
+      if (matches.length > 0) {
+        const item = matches[0];
+        document.getElementById('duplicateAlertMsg').innerText = `「${item.maker} ${item.productCode} ${item.name}」が現在 ${item.count}本 登録されています。`;
+        document.getElementById('duplicateAlert').classList.remove('hidden');
+      } else {
+        document.getElementById('duplicateAlert').classList.add('hidden');
+      }
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('formPaintId').value;
+      const maker = document.getElementById('formMaker').value;
+      const type = document.getElementById('formType').value;
+      const productCode = document.getElementById('formProductCode').value.trim().toUpperCase();
+      const name = document.getElementById('formName').value.trim();
+      const jan = document.getElementById('formJan').value.trim();
+      const count = parseInt(document.getElementById('formCount').value, 10);
+
+      const paintData = {
+        maker,
+        type,
+        productCode,
+        name,
+        jan,
+        count: isNaN(count) ? 1 : count,
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        if (id) {
+          await db.paints.update(parseInt(id, 10), paintData);
+          showToast(`「${name}」を更新しました`, "success");
+        } else {
+          await db.paints.add(paintData);
+          showToast(`「${name}」を新規登録しました (${count}本)`, "success");
+        }
+        closeRegisterModal();
+        renderList();
+      } catch (err) {
+        console.error("Save error", err);
+        showToast("保存に失敗しました", "error");
+      }
+    }
+
+    /* ========================================================
+       5. List Rendering, Instant Search & One-tap Stock Controls
+       ======================================================== */
+    async function renderList() {
+      const searchKeyword = (document.getElementById('searchInput').value || "").trim().toLowerCase();
+      document.getElementById('clearSearchBtn').classList.toggle('hidden', searchKeyword === "");
+
+      let collection = db.paints.orderBy('productCode');
+      let items = await collection.toArray();
+
+      // Filter: Type
+      if (currentFilterType !== 'ALL') {
+        items = items.filter(p => p.type === currentFilterType);
+      }
+      // Filter: Maker
+      if (currentFilterMaker !== 'ALL') {
+        items = items.filter(p => p.maker === currentFilterMaker);
+      }
+      // Filter: Search Keyword (matches product code, name, or jan)
+      if (searchKeyword) {
+        items = items.filter(p => 
+          (p.productCode && p.productCode.toLowerCase().includes(searchKeyword)) ||
+          (p.name && p.name.toLowerCase().includes(searchKeyword)) ||
+          (p.maker && p.maker.toLowerCase().includes(searchKeyword)) ||
+          (p.jan && p.jan.includes(searchKeyword))
+        );
+      }
+
+      const totalKinds = (await db.paints.count());
+      document.getElementById('headerTotalBadge').innerText = `(${totalKinds}種)`;
+
+      const container = document.getElementById('paintList');
+      const emptyState = document.getElementById('emptyState');
+
+      if (items.length === 0) {
+        container.innerHTML = "";
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      
+      container.innerHTML = items.map(paint => {
+        // Tag styles based on paint category
+        let typeBadgeClass = "bg-slate-700/80 text-slate-300 border-slate-600";
+        if (paint.type === 'ラッカー') typeBadgeClass = "bg-blue-950/70 text-blue-300 border-blue-700/40";
+        else if (paint.type === '水性') typeBadgeClass = "bg-emerald-950/70 text-emerald-300 border-emerald-700/40";
+        else if (paint.type === 'エナメル') typeBadgeClass = "bg-amber-950/70 text-amber-300 border-amber-700/40";
+
+        const isOutOfStock = paint.count <= 0;
+
+        return `
+          <div class="p-3.5 rounded-2xl bg-slate-800/60 border ${isOutOfStock ? 'border-dashed border-rose-900/60 bg-rose-950/10' : 'border-slate-800'} flex items-center justify-between gap-3 transition">
+            
+            <!-- Left Info Area -->
+            <div class="flex-1 min-w-0 cursor-pointer" onclick="editPaint(${paint.id})">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide border ${typeBadgeClass}">
+                  ${paint.type}
+                </span>
+                <span class="text-[11px] font-medium text-slate-400">
+                  ${paint.maker}
+                </span>
+                ${paint.jan ? `<i class="ph-bold ph-barcode text-slate-500 text-xs" title="JAN: ${paint.jan}"></i>` : ''}
+              </div>
+
+              <div class="mt-1 flex items-baseline gap-2">
+                <span class="text-sm font-extrabold text-sky-400 font-mono tracking-wider">${escapeHtml(paint.productCode)}</span>
+                <span class="text-xs font-semibold text-slate-200 truncate">${escapeHtml(paint.name)}</span>
+              </div>
+
+              ${isOutOfStock ? `
+                <div class="mt-1 flex items-center gap-1 text-[11px] font-bold text-rose-400">
+                  <i class="ph-bold ph-warning"></i> 在庫切れ (買い物リスト候補)
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Right Quantity Stepper Buttons -->
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <button 
+                onclick="quickUpdateCount(${paint.id}, -1)" 
+                title="1本減らす"
+                class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-90 border border-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold transition">
+                -
+              </button>
+              
+              <div class="w-10 text-center">
+                <span class="text-base font-black ${isOutOfStock ? 'text-rose-400' : 'text-white'} font-mono leading-none">
+                  ${paint.count}
+                </span>
+                <span class="block text-[9px] text-slate-500 leading-tight">本</span>
+              </div>
+
+              <button 
+                onclick="quickUpdateCount(${paint.id}, 1)" 
+                title="1本増やす"
+                class="w-8 h-8 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 active:scale-90 border border-sky-500/40 flex items-center justify-center text-sky-300 text-sm font-bold transition">
+                +
+              </button>
+
+              <button 
+                onclick="deletePaint(${paint.id}, '${escapeHtml(paint.name)}')" 
+                title="削除"
+                class="p-2 ml-1 text-slate-500 hover:text-rose-400 active:scale-90 transition">
+                <i class="ph-bold ph-trash text-sm"></i>
+              </button>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function quickUpdateCount(id, delta) {
+      const paint = await db.paints.get(id);
+      if (!paint) return;
+      const newCount = Math.max(0, (paint.count || 0) + delta);
+      await db.paints.update(id, { count: newCount, updatedAt: new Date().toISOString() });
+      if (delta > 0) playBeep(true);
+      renderList();
+    }
+
+    async function editPaint(id) {
+      const paint = await db.paints.get(id);
+      if (paint) {
+        openRegisterModal(paint);
+      }
+    }
+
+    async function deletePaint(id, name) {
+      if (window.confirm(`「${name}」を削除してもよろしいですか？`)) {
+        await db.paints.delete(id);
+        showToast(`「${name}」を削除しました`, "warn");
+        renderList();
+      }
+    }
+
+    function setFilter(category, val) {
+      if (category === 'type') {
+        currentFilterType = val;
+      } else if (category === 'maker') {
+        currentFilterMaker = currentFilterMaker === val ? 'ALL' : val;
+      }
+      
+      // Update UI active styles
+      document.querySelectorAll('.filter-chip').forEach(btn => {
+        btn.classList.remove('bg-sky-600', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-400');
+      });
+
+      const activeTypeEl = document.getElementById(`filter-type-${currentFilterType}`);
+      if (activeTypeEl) {
+        activeTypeEl.classList.remove('bg-slate-800', 'text-slate-400');
+        activeTypeEl.classList.add('bg-sky-600', 'text-white');
+      }
+      if (currentFilterMaker !== 'ALL') {
+        const activeMakerEl = document.getElementById(`filter-maker-${currentFilterMaker}`);
+        if (activeMakerEl) {
+          activeMakerEl.classList.remove('bg-slate-800', 'text-slate-400');
+          activeMakerEl.classList.add('bg-sky-600', 'text-white');
+        }
+      }
+
+      renderList();
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = "";
+      renderList();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+
+    /* ========================================================
+       6. Settings, Backup, Sample Seeding & Debug Tools
+       ======================================================== */
+    function openSettingsModal() {
+      document.getElementById('settingsModal').classList.remove('hidden');
+      document.getElementById('settingsModal').classList.add('flex');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+      document.getElementById('settingsModal').classList.remove('flex');
+    }
+
+    async function seedSampleData() {
+      const samplePaints = [
+        { maker: "GSIクレオス", type: "ラッカー", productCode: "C1", name: "ホワイト (光沢)", jan: "4973028531008", count: 2, updatedAt: new Date().toISOString() },
+        { maker: "GSIクレオス", type: "ラッカー", productCode: "C2", name: "ブラック (光沢)", jan: "4973028531015", count: 1, updatedAt: new Date().toISOString() },
+        { maker: "ガイアノーツ", type: "ラッカー", productCode: "001", name: "アルティメットホワイト", jan: "4571180810017", count: 1, updatedAt: new Date().toISOString() },
+        { maker: "ガイアノーツ", type: "ラッカー", productCode: "002", name: "ピュアブラック", jan: "4571180810024", count: 0, updatedAt: new Date().toISOString() },
+        { maker: "タミヤ", type: "エナメル", productCode: "XF-1", name: "フラットブラック", jan: "4950344817016", count: 3, updatedAt: new Date().toISOString() }
+      ];
+
+      for (const item of samplePaints) {
+        const exist = await db.paints.where('productCode').equalsIgnoreCase(item.productCode).filter(p => p.maker === item.maker).first();
+        if (!exist) {
+          await db.paints.add(item);
+        }
+      }
+
+      showToast("定番サンプル塗料5本を追加しました！", "success");
+      closeSettingsModal();
+      renderList();
+    }
+
+    async function exportDataJSON() {
+      const allPaints = await db.paints.toArray();
+      const exportObject = {
+        app: "PaintBox",
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        paints: allPaints
+      };
+
+      const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", jsonStr);
+      downloadAnchor.setAttribute("download", `paintbox_backup_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      showToast("JSONバックアップファイルをダウンロードしました", "success");
+      closeSettingsModal();
+    }
+
+    function importDataJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          const items = Array.isArray(parsed) ? parsed : (parsed.paints || []);
+          if (!items || items.length === 0) {
+            showToast("インポートできる塗料データがありませんでした", "warn");
+            return;
+          }
+
+          let addedCount = 0;
+          for (const item of items) {
+            delete item.id; // Allow auto-increment to handle IDs cleanly
+            await db.paints.add(item);
+            addedCount++;
+          }
+
+          showToast(`${addedCount}件の塗料データをインポートしました！`, "success");
+          closeSettingsModal();
+          renderList();
+        } catch (err) {
+          console.error("Import error", err);
+          showToast("JSONファイルの解析に失敗しました", "error");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    async function clearAllData() {
+      if (window.confirm("本当にすべての塗料データを削除しますか？\n（復元できません）")) {
+        await db.paints.clear();
+        showToast("すべてのデータを初期化しました", "warn");
+        closeSettingsModal();
+        renderList();
+      }
+    }
+
+    /* Initialize on load */
+    window.onload = function() {
+      renderList();
+    };
+  </script>
+</body>
+</html>
