@@ -102,7 +102,6 @@
 
     <!-- View 4: Settings (設定・診断) -->
     <section id="view-settings" class="space-y-3 hidden">
-      <!-- Yahoo API Settings Box -->
       <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2 text-indigo-700 font-bold text-sm">
@@ -112,7 +111,7 @@
           <span id="apiStatusTag" class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-500">未設定</span>
         </div>
         <p class="text-xs text-slate-600 leading-relaxed">
-          未知のJANコードをスキャンまたは入力した際、Yahoo!ショッピングから品名・メーカーを自動取得します。LINEヤフーで取得したClient ID（App ID）を入力してください。
+          未知のJANコードを検索した際、Yahoo!ショッピングから品名・メーカーを自動取得します。LINEヤフーで取得したClient ID（App ID）を入力してください。
         </p>
         <div class="space-y-1.5">
           <label class="text-[11px] font-bold text-slate-500">Yahoo! Client ID (App ID)</label>
@@ -121,8 +120,8 @@
             <button onclick="saveYahooAppId()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold active:bg-indigo-700">保存</button>
           </div>
         </div>
-        <button onclick="testYahooApiConnection()" class="w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
-          <i class="fa-solid fa-plug mr-1"></i>API接続テスト (水性ホビーカラー H-1でテスト)
+        <button onclick="testYahooApiConnection()" class="w-full py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold">
+          <i class="fa-solid fa-plug mr-1"></i>API通信テスト (4973028943184 で検証)
         </button>
       </div>
 
@@ -145,13 +144,9 @@
         </div>
       </div>
 
-      <!-- Reset & Reload Master -->
+      <!-- Reset -->
       <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-2">
-        <h3 class="text-xs font-bold text-slate-700">データベース操作</h3>
-        <button onclick="reloadTamiyaMasterPrompt()" class="w-full text-left py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-medium text-sky-800 flex justify-between items-center">
-          <span>タミヤラッカー全85色のマスタ辞書を再同期</span>
-          <i class="fa-solid fa-arrows-rotate text-sky-600 text-xs"></i>
-        </button>
+        <h3 class="text-xs font-bold text-slate-700">データベース初期化</h3>
         <button onclick="clearAllData()" class="w-full text-left py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-medium text-rose-700 flex justify-between items-center">
           <span>全データをリセット</span>
           <i class="fa-solid fa-trash text-rose-500 text-xs"></i>
@@ -196,7 +191,6 @@
 
   <!-- Modal: Scanner (スキャナー) -->
   <div id="scanModal" class="fixed inset-0 z-50 bg-black/80 flex flex-col justify-end hidden">
-    <!-- Screen Light Overlay for iPhone -->
     <div id="screenLightOverlay" class="fixed inset-0 bg-white pointer-events-none opacity-0 transition-opacity z-10"></div>
 
     <div class="bg-white rounded-t-3xl p-4 max-w-md w-full mx-auto max-h-[92vh] flex flex-col overflow-hidden relative z-20">
@@ -224,20 +218,17 @@
       <!-- Camera Preview Box -->
       <div class="relative w-full aspect-square bg-slate-900 rounded-2xl overflow-hidden my-1 flex items-center justify-center">
         <div id="reader" class="w-full h-full"></div>
-        <!-- Target Frame -->
         <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
           <div class="w-3/4 h-28 border-2 border-indigo-400/80 rounded-xl bg-indigo-500/10 flex items-center justify-center">
             <span class="text-white/80 text-[11px] font-mono tracking-wider drop-shadow">20cmほど離して枠内へ</span>
           </div>
         </div>
-        <!-- API Loading Indicator -->
         <div id="apiLoadingOverlay" class="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white space-y-2 hidden">
           <div class="w-8 h-8 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
           <span class="text-xs font-semibold">Yahoo!で商品情報を検索中...</span>
         </div>
       </div>
 
-      <!-- Feedback Banner -->
       <div id="lastScannedBox" class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-0.5 hidden">
         <div class="flex justify-between items-center">
           <span class="font-bold text-slate-800" id="scanResultTitle">塗料名</span>
@@ -256,7 +247,14 @@
 
   <!-- Modal: Manual Add / Edit Form -->
   <div id="manualModal" class="fixed inset-0 z-50 bg-black/70 flex flex-col justify-end hidden">
-    <div class="bg-white rounded-t-3xl p-5 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto">
+    <div class="bg-white rounded-t-3xl p-5 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto relative">
+      
+      <!-- Manual Search Loading Overlay -->
+      <div id="manualLoadingOverlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center space-y-2 hidden">
+        <div class="w-9 h-9 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <span class="text-xs font-bold text-indigo-700">Yahoo!ショッピングで照会中...</span>
+      </div>
+
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <h2 class="text-sm font-bold text-slate-800" id="modalFormTitle">塗料の登録 / 編集</h2>
         <button onclick="closeManualModal()" class="text-slate-400 text-lg w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center">
@@ -275,12 +273,11 @@
           <label class="text-[11px] font-bold text-slate-500">JANコード (数字)</label>
           <div class="flex space-x-1.5 mt-0.5">
             <input type="text" id="form-jan" oninput="checkDuplicateJan()" placeholder="4973028..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 font-mono">
-            <button type="button" onclick="triggerYahooSearchFromInput()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1">
+            <button type="button" onclick="triggerYahooSearchFromInput()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 shadow-sm active:scale-95 transition-transform">
               <i class="fa-solid fa-magnifying-glass"></i>
               <span>Yahoo!照会</span>
             </button>
           </div>
-          <!-- Fallback Link for jancode.xyz -->
           <div class="pt-1 flex justify-between items-center text-[11px]">
             <span class="text-slate-400">見つからない場合:</span>
             <a id="externalJanLink" href="#" target="_blank" class="text-blue-600 underline font-medium">jancode.xyz で探す</a>
@@ -319,7 +316,7 @@
           </div>
           <div class="col-span-2">
             <label class="text-[11px] font-bold text-slate-500">品名 (Color Name)</label>
-            <input type="text" id="form-name" required placeholder="ブラック, ジャーマングレイ" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
+            <input type="text" id="form-name" required placeholder="ブラック, 聖グロリアーナ..." class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
           </div>
         </div>
 
@@ -381,95 +378,95 @@
   <script>
     // --- 1. 内蔵マスターデータ（タミヤラッカー全85色完全収録） ---
     const TAMIYA_LP_MASTER = [
-      {jan:"4950344813018", maker:"タミヤ", code:"LP-1", name:"ブラック", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813025", maker:"タミヤ", code:"LP-2", name:"ホワイト", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813032", maker:"タミヤ", code:"LP-3", name:"フラットブラック", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813049", maker:"タミヤ", code:"LP-4", name:"フラットホワイト", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813056", maker:"タミヤ", code:"LP-5", name:"セミグロスブラック", category:"ラッカー", gloss:"半光沢"},
-      {jan:"4950344813063", maker:"タミヤ", code:"LP-6", name:"ピュアーブルー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813070", maker:"タミヤ", code:"LP-7", name:"ピュアーレッド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813087", maker:"タミヤ", code:"LP-8", name:"ピュアイエロー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813094", maker:"タミヤ", code:"LP-9", name:"クリヤー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813100", maker:"タミヤ", code:"LP-10", name:"ラッカー溶剤", category:"ラッカー", gloss:"溶剤"},
-      {jan:"4950344813117", maker:"タミヤ", code:"LP-11", name:"シルバー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813124", maker:"タミヤ", code:"LP-12", name:"呉海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813131", maker:"タミヤ", code:"LP-13", name:"佐世保海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813148", maker:"タミヤ", code:"LP-14", name:"舞鶴海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813155", maker:"タミヤ", code:"LP-15", name:"横須賀海軍工廠グレイ(日本海軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813162", maker:"タミヤ", code:"LP-16", name:"木甲板色", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813179", maker:"タミヤ", code:"LP-17", name:"リノリウム甲板色", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813186", maker:"タミヤ", code:"LP-18", name:"ダルレッド", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813193", maker:"タミヤ", code:"LP-19", name:"ガンメタル", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813209", maker:"タミヤ", code:"LP-20", name:"ライトガンメタル", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813216", maker:"タミヤ", code:"LP-21", name:"イタリアンレッド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813223", maker:"タミヤ", code:"LP-22", name:"フラットベース", category:"ラッカー", gloss:"添加剤"},
-      {jan:"4950344813230", maker:"タミヤ", code:"LP-23", name:"フラットクリヤー", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813247", maker:"タミヤ", code:"LP-24", name:"セミグロスクリヤー", category:"ラッカー", gloss:"半光沢"},
-      {jan:"4950344813254", maker:"タミヤ", code:"LP-25", name:"茶色(陸上自衛隊)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813261", maker:"タミヤ", code:"LP-26", name:"濃緑色(陸上自衛隊)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813278", maker:"タミヤ", code:"LP-27", name:"ジャーマングレイ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813285", maker:"タミヤ", code:"LP-28", name:"オリーブドラブ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813292", maker:"タミヤ", code:"LP-29", name:"オリーブドラブ2", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813308", maker:"タミヤ", code:"LP-30", name:"ライトサンド", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813315", maker:"タミヤ", code:"LP-31", name:"暗緑色2(日本海軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813322", maker:"タミヤ", code:"LP-32", name:"明灰白色(日本海軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813339", maker:"タミヤ", code:"LP-33", name:"灰緑色(日本海軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813346", maker:"タミヤ", code:"LP-34", name:"ライトグレイ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813353", maker:"タミヤ", code:"LP-35", name:"インシグニアホワイト", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813360", maker:"タミヤ", code:"LP-36", name:"ダークゴーストグレイ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813377", maker:"タミヤ", code:"LP-37", name:"ライトゴーストグレイ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813384", maker:"タミヤ", code:"LP-38", name:"フラットアルミ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813391", maker:"タミヤ", code:"LP-39", name:"レーシングホワイト", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813407", maker:"タミヤ", code:"LP-40", name:"メタリックブラック", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813414", maker:"タミヤ", code:"LP-41", name:"マイカブルー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813421", maker:"タミヤ", code:"LP-42", name:"マイカレッド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813438", maker:"タミヤ", code:"LP-43", name:"パールホワイト", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813445", maker:"タミヤ", code:"LP-44", name:"メタリックオレンジ", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813452", maker:"タミヤ", code:"LP-45", name:"レーシングブルー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813469", maker:"タミヤ", code:"LP-46", name:"ピュアーメタリックレッド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813476", maker:"タミヤ", code:"LP-47", name:"パールブルー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813483", maker:"タミヤ", code:"LP-48", name:"スパークリングシルバー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813490", maker:"タミヤ", code:"LP-49", name:"パールクリヤー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813506", maker:"タミヤ", code:"LP-50", name:"ブライトレッド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813513", maker:"タミヤ", code:"LP-51", name:"ピュアーオレンジ", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813520", maker:"タミヤ", code:"LP-52", name:"クリヤーレッド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813537", maker:"タミヤ", code:"LP-53", name:"クリヤーオレンジ", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813544", maker:"タミヤ", code:"LP-54", name:"ダークアイアン(履帯色)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813551", maker:"タミヤ", code:"LP-55", name:"ダークイエロー2(ドイツ陸軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813568", maker:"タミヤ", code:"LP-56", name:"ダークグリーン2(ドイツ陸軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813575", maker:"タミヤ", code:"LP-57", name:"レッドブラウン2(ドイツ陸軍)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813582", maker:"タミヤ", code:"LP-58", name:"NATOグリーン", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813599", maker:"タミヤ", code:"LP-59", name:"NATOブラウン", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813605", maker:"タミヤ", code:"LP-60", name:"NATOブラック", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813612", maker:"タミヤ", code:"LP-61", name:"メタリックグレイ", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813629", maker:"タミヤ", code:"LP-62", name:"チタンゴールド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813636", maker:"タミヤ", code:"LP-63", name:"チタンシルバー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813643", maker:"タミヤ", code:"LP-64", name:"OD色(陸上自衛隊)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813650", maker:"タミヤ", code:"LP-65", name:"ラバーブラック", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813667", maker:"タミヤ", code:"LP-66", name:"フラットフレッシュ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813674", maker:"タミヤ", code:"LP-67", name:"スモーク", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813681", maker:"タミヤ", code:"LP-68", name:"クリヤーブルー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813698", maker:"タミヤ", code:"LP-69", name:"クリヤーイエロー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813704", maker:"タミヤ", code:"LP-70", name:"アルミシルバー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813711", maker:"タミヤ", code:"LP-71", name:"シャンパンゴールド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813728", maker:"タミヤ", code:"LP-72", name:"マイカシルバー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813735", maker:"タミヤ", code:"LP-73", name:"カーキ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813742", maker:"タミヤ", code:"LP-74", name:"フラットアース", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813759", maker:"タミヤ", code:"LP-75", name:"バフ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813766", maker:"タミヤ", code:"LP-76", name:"イエローブラウン(DAK 1941〜)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813773", maker:"タミヤ", code:"LP-77", name:"ライトブラウン(DAK 1942〜)", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813780", maker:"タミヤ", code:"LP-78", name:"フラットブルー", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813797", maker:"タミヤ", code:"LP-79", name:"フラットレッド", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813803", maker:"タミヤ", code:"LP-80", name:"フラットイエロー", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813810", maker:"タミヤ", code:"LP-81", name:"調色用ブルー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813827", maker:"タミヤ", code:"LP-82", name:"調色用レッド", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813834", maker:"タミヤ", code:"LP-83", name:"調色用イエロー", category:"ラッカー", gloss:"光沢"},
-      {jan:"4950344813841", maker:"タミヤ", code:"LP-84", name:"カモフラージュグレイ", category:"ラッカー", gloss:"つや消し"},
-      {jan:"4950344813858", maker:"タミヤ", code:"LP-85", name:"ミディアムエアーグレイ", category:"ラッカー", gloss:"つや消し"}
+      {jan:"4950344813018", maker:"タミヤ", code:"LP-1", name:"ブラック", category:"ラッカー"},
+      {jan:"4950344813025", maker:"タミヤ", code:"LP-2", name:"ホワイト", category:"ラッカー"},
+      {jan:"4950344813032", maker:"タミヤ", code:"LP-3", name:"フラットブラック", category:"ラッカー"},
+      {jan:"4950344813049", maker:"タミヤ", code:"LP-4", name:"フラットホワイト", category:"ラッカー"},
+      {jan:"4950344813056", maker:"タミヤ", code:"LP-5", name:"セミグロスブラック", category:"ラッカー"},
+      {jan:"4950344813063", maker:"タミヤ", code:"LP-6", name:"ピュアーブルー", category:"ラッカー"},
+      {jan:"4950344813070", maker:"タミヤ", code:"LP-7", name:"ピュアーレッド", category:"ラッカー"},
+      {jan:"4950344813087", maker:"タミヤ", code:"LP-8", name:"ピュアイエロー", category:"ラッカー"},
+      {jan:"4950344813094", maker:"タミヤ", code:"LP-9", name:"クリヤー", category:"ラッカー"},
+      {jan:"4950344813100", maker:"タミヤ", code:"LP-10", name:"ラッカー溶剤", category:"ラッカー"},
+      {jan:"4950344813117", maker:"タミヤ", code:"LP-11", name:"シルバー", category:"ラッカー"},
+      {jan:"4950344813124", maker:"タミヤ", code:"LP-12", name:"呉海軍工廠グレイ(日本海軍)", category:"ラッカー"},
+      {jan:"4950344813131", maker:"タミヤ", code:"LP-13", name:"佐世保海軍工廠グレイ(日本海軍)", category:"ラッカー"},
+      {jan:"4950344813148", maker:"タミヤ", code:"LP-14", name:"舞鶴海軍工廠グレイ(日本海軍)", category:"ラッカー"},
+      {jan:"4950344813155", maker:"タミヤ", code:"LP-15", name:"横須賀海軍工廠グレイ(日本海軍)", category:"ラッカー"},
+      {jan:"4950344813162", maker:"タミヤ", code:"LP-16", name:"木甲板色", category:"ラッカー"},
+      {jan:"4950344813179", maker:"タミヤ", code:"LP-17", name:"リノリウム甲板色", category:"ラッカー"},
+      {jan:"4950344813186", maker:"タミヤ", code:"LP-18", name:"ダルレッド", category:"ラッカー"},
+      {jan:"4950344813193", maker:"タミヤ", code:"LP-19", name:"ガンメタル", category:"ラッカー"},
+      {jan:"4950344813209", maker:"タミヤ", code:"LP-20", name:"ライトガンメタル", category:"ラッカー"},
+      {jan:"4950344813216", maker:"タミヤ", code:"LP-21", name:"イタリアンレッド", category:"ラッカー"},
+      {jan:"4950344813223", maker:"タミヤ", code:"LP-22", name:"フラットベース", category:"ラッカー"},
+      {jan:"4950344813230", maker:"タミヤ", code:"LP-23", name:"フラットクリヤー", category:"ラッカー"},
+      {jan:"4950344813247", maker:"タミヤ", code:"LP-24", name:"セミグロスクリヤー", category:"ラッカー"},
+      {jan:"4950344813254", maker:"タミヤ", code:"LP-25", name:"茶色(陸上自衛隊)", category:"ラッカー"},
+      {jan:"4950344813261", maker:"タミヤ", code:"LP-26", name:"濃緑色(陸上自衛隊)", category:"ラッカー"},
+      {jan:"4950344813278", maker:"タミヤ", code:"LP-27", name:"ジャーマングレイ", category:"ラッカー"},
+      {jan:"4950344813285", maker:"タミヤ", code:"LP-28", name:"オリーブドラブ", category:"ラッカー"},
+      {jan:"4950344813292", maker:"タミヤ", code:"LP-29", name:"オリーブドラブ2", category:"ラッカー"},
+      {jan:"4950344813308", maker:"タミヤ", code:"LP-30", name:"ライトサンド", category:"ラッカー"},
+      {jan:"4950344813315", maker:"タミヤ", code:"LP-31", name:"暗緑色2(日本海軍)", category:"ラッカー"},
+      {jan:"4950344813322", maker:"タミヤ", code:"LP-32", name:"明灰白色(日本海軍)", category:"ラッカー"},
+      {jan:"4950344813339", maker:"タミヤ", code:"LP-33", name:"灰緑色(日本海軍)", category:"ラッカー"},
+      {jan:"4950344813346", maker:"タミヤ", code:"LP-34", name:"ライトグレイ", category:"ラッカー"},
+      {jan:"4950344813353", maker:"タミヤ", code:"LP-35", name:"インシグニアホワイト", category:"ラッカー"},
+      {jan:"4950344813360", maker:"タミヤ", code:"LP-36", name:"ダークゴーストグレイ", category:"ラッカー"},
+      {jan:"4950344813377", maker:"タミヤ", code:"LP-37", name:"ライトゴーストグレイ", category:"ラッカー"},
+      {jan:"4950344813384", maker:"タミヤ", code:"LP-38", name:"フラットアルミ", category:"ラッカー"},
+      {jan:"4950344813391", maker:"タミヤ", code:"LP-39", name:"レーシングホワイト", category:"ラッカー"},
+      {jan:"4950344813407", maker:"タミヤ", code:"LP-40", name:"メタリックブラック", category:"ラッカー"},
+      {jan:"4950344813414", maker:"タミヤ", code:"LP-41", name:"マイカブルー", category:"ラッカー"},
+      {jan:"4950344813421", maker:"タミヤ", code:"LP-42", name:"マイカレッド", category:"ラッカー"},
+      {jan:"4950344813438", maker:"タミヤ", code:"LP-43", name:"パールホワイト", category:"ラッカー"},
+      {jan:"4950344813445", maker:"タミヤ", code:"LP-44", name:"メタリックオレンジ", category:"ラッカー"},
+      {jan:"4950344813452", maker:"タミヤ", code:"LP-45", name:"レーシングブルー", category:"ラッカー"},
+      {jan:"4950344813469", maker:"タミヤ", code:"LP-46", name:"ピュアーメタリックレッド", category:"ラッカー"},
+      {jan:"4950344813476", maker:"タミヤ", code:"LP-47", name:"パールブルー", category:"ラッカー"},
+      {jan:"4950344813483", maker:"タミヤ", code:"LP-48", name:"スパークリングシルバー", category:"ラッカー"},
+      {jan:"4950344813490", maker:"タミヤ", code:"LP-49", name:"パールクリヤー", category:"ラッカー"},
+      {jan:"4950344813506", maker:"タミヤ", code:"LP-50", name:"ブライトレッド", category:"ラッカー"},
+      {jan:"4950344813513", maker:"タミヤ", code:"LP-51", name:"ピュアーオレンジ", category:"ラッカー"},
+      {jan:"4950344813520", maker:"タミヤ", code:"LP-52", name:"クリヤーレッド", category:"ラッカー"},
+      {jan:"4950344813537", maker:"タミヤ", code:"LP-53", name:"クリヤーオレンジ", category:"ラッカー"},
+      {jan:"4950344813544", maker:"タミヤ", code:"LP-54", name:"ダークアイアン(履帯色)", category:"ラッカー"},
+      {jan:"4950344813551", maker:"タミヤ", code:"LP-55", name:"ダークイエロー2(ドイツ陸軍)", category:"ラッカー"},
+      {jan:"4950344813568", maker:"タミヤ", code:"LP-56", name:"ダークグリーン2(ドイツ陸軍)", category:"ラッカー"},
+      {jan:"4950344813575", maker:"タミヤ", code:"LP-57", name:"レッドブラウン2(ドイツ陸軍)", category:"ラッカー"},
+      {jan:"4950344813582", maker:"タミヤ", code:"LP-58", name:"NATOグリーン", category:"ラッカー"},
+      {jan:"4950344813599", maker:"タミヤ", code:"LP-59", name:"NATOブラウン", category:"ラッカー"},
+      {jan:"4950344813605", maker:"タミヤ", code:"LP-60", name:"NATOブラック", category:"ラッカー"},
+      {jan:"4950344813612", maker:"タミヤ", code:"LP-61", name:"メタリックグレイ", category:"ラッカー"},
+      {jan:"4950344813629", maker:"タミヤ", code:"LP-62", name:"チタンゴールド", category:"ラッカー"},
+      {jan:"4950344813636", maker:"タミヤ", code:"LP-63", name:"チタンシルバー", category:"ラッカー"},
+      {jan:"4950344813643", maker:"タミヤ", code:"LP-64", name:"OD色(陸上自衛隊)", category:"ラッカー"},
+      {jan:"4950344813650", maker:"タミヤ", code:"LP-65", name:"ラバーブラック", category:"ラッカー"},
+      {jan:"4950344813667", maker:"タミヤ", code:"LP-66", name:"フラットフレッシュ", category:"ラッカー"},
+      {jan:"4950344813674", maker:"タミヤ", code:"LP-67", name:"スモーク", category:"ラッカー"},
+      {jan:"4950344813681", maker:"タミヤ", code:"LP-68", name:"クリヤーブルー", category:"ラッカー"},
+      {jan:"4950344813698", maker:"タミヤ", code:"LP-69", name:"クリヤーイエロー", category:"ラッカー"},
+      {jan:"4950344813704", maker:"タミヤ", code:"LP-70", name:"アルミシルバー", category:"ラッカー"},
+      {jan:"4950344813711", maker:"タミヤ", code:"LP-71", name:"シャンパンゴールド", category:"ラッカー"},
+      {jan:"4950344813728", maker:"タミヤ", code:"LP-72", name:"マイカシルバー", category:"ラッカー"},
+      {jan:"4950344813735", maker:"タミヤ", code:"LP-73", name:"カーキ", category:"ラッカー"},
+      {jan:"4950344813742", maker:"タミヤ", code:"LP-74", name:"フラットアース", category:"ラッカー"},
+      {jan:"4950344813759", maker:"タミヤ", code:"LP-75", name:"バフ", category:"ラッカー"},
+      {jan:"4950344813766", maker:"タミヤ", code:"LP-76", name:"イエローブラウン(DAK 1941〜)", category:"ラッカー"},
+      {jan:"4950344813773", maker:"タミヤ", code:"LP-77", name:"ライトブラウン(DAK 1942〜)", category:"ラッカー"},
+      {jan:"4950344813780", maker:"タミヤ", code:"LP-78", name:"フラットブルー", category:"ラッカー"},
+      {jan:"4950344813797", maker:"タミヤ", code:"LP-79", name:"フラットレッド", category:"ラッカー"},
+      {jan:"4950344813803", maker:"タミヤ", code:"LP-80", name:"フラットイエロー", category:"ラッカー"},
+      {jan:"4950344813810", maker:"タミヤ", code:"LP-81", name:"調色用ブルー", category:"ラッカー"},
+      {jan:"4950344813827", maker:"タミヤ", code:"LP-82", name:"調色用レッド", category:"ラッカー"},
+      {jan:"4950344813834", maker:"タミヤ", code:"LP-83", name:"調色用イエロー", category:"ラッカー"},
+      {jan:"4950344813841", maker:"タミヤ", code:"LP-84", name:"カモフラージュグレイ", category:"ラッカー"},
+      {jan:"4950344813858", maker:"タミヤ", code:"LP-85", name:"ミディアムエアーグレイ", category:"ラッカー"}
     ];
 
     // --- 2. Database Initialization (Dexie.js) ---
-    const db = new Dexie("PlamoPaintDB_v4");
+    const db = new Dexie("PlamoPaintDB_v5");
     db.version(1).stores({
       paints: "++id, jan, maker, code, name, category, count, location, updatedAt",
       recipes: "++id, kit, formula, note, createdAt",
@@ -506,7 +503,7 @@
       setTimeout(() => t.classList.add("opacity-0", "pointer-events-none"), 2400);
     }
 
-    // --- 3. Screen Torch (iPhone Safari Screen Light) ---
+    // --- 3. Screen Torch ---
     function toggleScreenTorch() {
       const overlay = document.getElementById("screenLightOverlay");
       const label = document.getElementById("torchLabel");
@@ -526,44 +523,44 @@
       }
     }
 
-    // --- 4. Yahoo! Shopping API Helper (2段階検索 + 多段プロキシ) ---
+    // --- 4. Yahoo! Shopping API Helper (完全クエリ検索化) ---
     async function queryYahooPaint(rawJanCode) {
-      const cleanJan = String(rawJanCode)
-        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-        .replace(/[^0-9]/g, "")
-        .trim();
+      const cleanJan = String(rawJanCode).replace(/[^0-9]/g, "").trim();
+      if (!cleanJan) return null;
+      if (!yahooAppId) return null;
 
-      if (!cleanJan || !yahooAppId) return null;
+      // キーワード検索（query）を直接使用（店舗の商品説明に含まれるJANも確実に捕捉）
+      const apiUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&query=${encodeURIComponent(cleanJan)}&results=5`;
 
-      const overlay = document.getElementById("apiLoadingOverlay");
-      if (overlay) overlay.classList.remove("hidden");
-
-      const urlByJan = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&jan_code=${encodeURIComponent(cleanJan)}&results=3`;
-      const urlByQuery = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&query=${encodeURIComponent(cleanJan)}&results=3`;
-
-      async function fetchWithProxy(targetUrl) {
+      async function fetchWithCors(targetUrl) {
         // Proxy 1: corsproxy.io
         try {
           const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`, { cache: "no-store" });
-          if (res.ok) return await res.json();
-        } catch (e) {}
+          if (res.ok) {
+            const json = await res.json();
+            if (json && json.hits) return json;
+          }
+        } catch (e) {
+          console.warn("Proxy 1 error:", e);
+        }
 
-        // Proxy 2: allorigins.win (fallback)
+        // Proxy 2: allorigins.win
         try {
-          const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, { cache: "no-store" });
-          if (res2.ok) return await res2.json();
-        } catch (e) {}
+          const res2 = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, { cache: "no-store" });
+          if (res2.ok) {
+            const wrapper = await res2.json();
+            if (wrapper && wrapper.contents) {
+              return JSON.parse(wrapper.contents);
+            }
+          }
+        } catch (e) {
+          console.warn("Proxy 2 error:", e);
+        }
         return null;
       }
 
       try {
-        let data = await fetchWithProxy(urlByJan);
-        
-        // jan_code で0件ならフリーワード検索（query）へフォールバック
-        if (!data || !data.hits || data.hits.length === 0) {
-          console.log("JAN厳密検索で0件のため、フリーワード検索にフォールバックします");
-          data = await fetchWithProxy(urlByQuery);
-        }
+        const data = await fetchWithCors(apiUrl);
 
         if (data && data.hits && data.hits.length > 0) {
           const item = data.hits[0];
@@ -600,20 +597,18 @@
         }
       } catch (err) {
         console.error("Yahoo API lookup error:", err);
-      } finally {
-        if (overlay) overlay.classList.add("hidden");
       }
       return null;
     }
 
     async function testYahooApiConnection() {
       if (!yahooAppId) return alert("先にYahoo! Client IDを入力して「保存」してください。");
-      showToast("API接続テスト中 (水性ホビーカラー H-1)...");
+      showToast("API通信中 (4973028943184)...");
       const res = await queryYahooPaint("4973028943184");
       if (res && res.name) {
-        alert(`API通信成功！\n取得結果:\nメーカー: ${res.maker}\n品番: ${res.code}\n品名: ${res.name}\n種別: ${res.category}`);
+        alert(`API照会成功！\n\n【商品名】\n${res.name}\n\n【メーカー】${res.maker}\n【種別】${res.category}\n【品番】${res.code || 'なし'}`);
       } else {
-        alert("API照会に失敗しました。\n・Client IDが正しいか確認してください\n・ネットワーク環境をご確認ください");
+        alert("API照会に失敗しました。\n・Client IDが正しく入力されているか確認してください\n・ネットワーク環境をご確認ください");
       }
     }
 
@@ -779,7 +774,7 @@
       `).join("");
     }
 
-    // --- 8. Barcode Scanner Logic (高解像度 & 焦点最適化) ---
+    // --- 8. Barcode Scanner Logic ---
     function openScanModal() {
       document.getElementById("scanModal").classList.remove("hidden");
       document.getElementById("lastScannedBox").classList.add("hidden");
@@ -821,7 +816,6 @@
       ).then(() => {
         isScanning = true;
       }).catch(err => {
-        console.warn("高解像度起動失敗、通常モードで再試行", err);
         html5QrCode.start(
           { facingMode: "environment" },
           { fps: 15, qrbox: { width: 250, height: 150 } },
@@ -845,7 +839,7 @@
       const cleanJan = decodedText.trim();
       const isBatch = document.getElementById("batchScanToggle").checked;
       
-      // 1. Search in local user inventory
+      // 1. Search in user inventory
       let existing = await db.paints.where("jan").equals(cleanJan).first();
       if (existing) {
         existing.count += 1;
@@ -865,9 +859,13 @@
         dictEntry = TAMIYA_LP_MASTER.find(p => p.jan === cleanJan);
       }
 
-      // 4. Query Yahoo! Shopping API if still unknown
+      // 4. Query Yahoo! API
       if (!dictEntry && yahooAppId) {
+        const overlay = document.getElementById("apiLoadingOverlay");
+        overlay.classList.remove("hidden");
         dictEntry = await queryYahooPaint(cleanJan);
+        overlay.classList.add("hidden");
+
         if (dictEntry) {
           await db.customDict.put(dictEntry);
         }
@@ -960,29 +958,40 @@
       const jan = document.getElementById("form-jan").value.trim();
       if (!jan) return alert("JANコードを入力してください");
       
-      // 1. Check built-in Tamiya Master first
+      // 1. 内蔵タミヤマスタをまず照合
       const localMatch = TAMIYA_LP_MASTER.find(p => p.jan === jan);
       if (localMatch) {
         document.getElementById("form-name").value = localMatch.name;
         document.getElementById("form-maker").value = localMatch.maker;
         document.getElementById("form-category").value = localMatch.category;
         document.getElementById("form-code").value = localMatch.code;
-        showToast("タミヤマスタから自動補完しました！");
+        showToast("タミヤマスタから自動入力しました！");
         return;
       }
 
-      // 2. Query Yahoo API (2-stage)
-      if (!yahooAppId) return alert("「設定」タブでYahoo! Client IDを保存してください");
-      showToast("Yahoo! APIに照会中...");
-      const res = await queryYahooPaint(jan);
-      if (res) {
-        document.getElementById("form-name").value = res.name;
-        document.getElementById("form-maker").value = res.maker;
-        document.getElementById("form-category").value = res.category;
-        if (res.code) document.getElementById("form-code").value = res.code;
-        showToast("商品情報を自動入力しました！");
-      } else {
-        alert("Yahoo!ショッピングで該当する塗料が見つかりませんでした。\n下の「jancode.xyzで探す」リンクをお試しください。");
+      // 2. Yahoo! API 検索
+      if (!yahooAppId) {
+        return alert("「設定」タブでYahoo! Client IDを保存してください。");
+      }
+
+      const overlay = document.getElementById("manualLoadingOverlay");
+      overlay.classList.remove("hidden");
+
+      try {
+        const res = await queryYahooPaint(jan);
+        if (res && res.name) {
+          document.getElementById("form-name").value = res.name;
+          document.getElementById("form-maker").value = res.maker;
+          document.getElementById("form-category").value = res.category;
+          if (res.code) document.getElementById("form-code").value = res.code;
+          showToast("商品情報を自動入力しました！");
+        } else {
+          alert(`Yahoo!ショッピングで商品名が見つかりませんでした。\n下の「jancode.xyz で探す」リンクをお試しください。`);
+        }
+      } catch (err) {
+        alert("照会中にエラーが発生しました: " + err.message);
+      } finally {
+        overlay.classList.add("hidden");
       }
     }
 
@@ -1079,7 +1088,7 @@
       }
     }
 
-    // --- 11. Settings, Backup & Sync ---
+    // --- 11. Settings & Backup ---
     function saveYahooAppId() {
       const val = document.getElementById("yahooAppIdInput").value.trim();
       yahooAppId = val;
@@ -1096,15 +1105,6 @@
       } else {
         tag.textContent = "未設定";
         tag.className = "text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-500";
-      }
-    }
-
-    async function reloadTamiyaMasterPrompt() {
-      if (confirm("内蔵のタミヤラッカー全85色を辞書にインポートしますか？")) {
-        for (const item of TAMIYA_LP_MASTER) {
-          await db.customDict.put(item);
-        }
-        showToast("タミヤ全85色の辞書を同期しました！");
       }
     }
 
