@@ -2,1557 +2,965 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>PaintBox Pro - プラモ塗料インベントリ</title>
-  
-  <!-- PWA Meta Tags -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#090d16">
-  <meta name="description" content="模型用塗料管理アプリ：JANバーコード連続スキャン、買い物リスト、調色レシピ記録、カスタム辞書学習対応">
-
-  <!-- Tailwind CSS CDN -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>塗料在庫マネージャー</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f0f9ff',
-              400: '#38bdf8',
-              500: '#0284c7',
-              600: '#0369a1',
-              700: '#075985',
-              900: '#0c4a6e',
-            }
-          }
-        }
-      }
-    }
-  </script>
-
-  <!-- Phosphor Icons (Lightweight SVG icons) -->
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <!-- Dexie.js (IndexedDB Wrapper) -->
-  <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
-  <!-- HTML5-QRCode (Barcode Scanner via Web Camera) -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
+  <!-- Dexie.js (IndexedDB wrapper) -->
+  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+  <!-- html5-qrcode (Barcode scanner) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Safe-area insets for notched iPhones and bottom bar spacing */
-    .safe-top { padding-top: env(safe-area-inset-top, 0px); }
-    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
-    /* Hide scrollbars for pill chips */
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    /* Video scanner container */
-    #qr-reader {
-      border: none !important;
-      width: 100% !important;
-    }
-    #qr-reader__scan_region video {
-      object-fit: cover !important;
-      border-radius: 1rem;
-    }
-    #qr-reader__dashboard {
-      display: none !important;
-    }
+    body { -webkit-tap-highlight-color: transparent; }
+    .pb-safe { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
 
-  <!-- Top Global Header -->
-  <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 safe-top">
-    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-2.5">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
-          <i class="ph-bold ph-paint-brush-broad text-lg"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base font-extrabold tracking-wide text-white">PaintBox <span class="text-[10px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full font-mono uppercase">Pro</span></h1>
-          </div>
-          <p class="text-[11px] text-slate-400">
-            在庫 <span id="headerTotalStock" class="text-sky-400 font-semibold font-mono">0</span> 本 / 
-            買物 <span id="headerWishlistBadge" class="text-amber-400 font-semibold font-mono">0</span> 件
-          </p>
-        </div>
+  <!-- Header -->
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+    <div class="flex items-center space-x-2">
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-inner">
+        <i class="fa-solid fa-fill-drip"></i>
       </div>
-
-      <div class="flex items-center gap-2">
-        <button onclick="openRegisterModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-medium text-xs shadow-md shadow-sky-600/20 transition">
-          <i class="ph-bold ph-plus text-sm"></i>
-          <span>手動登録</span>
-        </button>
+      <div>
+        <h1 class="text-base font-bold leading-tight text-slate-900">プラモ塗料マネージャー</h1>
+        <p class="text-[10px] text-slate-500 font-medium">在庫・調色・購入支援</p>
       </div>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button onclick="openManualModal()" class="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1.5 rounded-lg border border-indigo-200 active:bg-indigo-100">
+        <i class="fa-solid fa-plus mr-1"></i>手動追加
+      </button>
     </div>
   </header>
 
-  <!-- Main View Container -->
-  <main class="flex-1 max-w-2xl w-full mx-auto p-4 pb-28">
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-semibold shadow-lg transition-all duration-300 opacity-0 pointer-events-none">
+    メッセージ
+  </div>
 
-    <!-- VIEW 1: INVENTORY (在庫一覧) -->
-    <div id="view-inventory" class="view-panel space-y-4">
-      
-      <!-- Search & Filters Block -->
-      <div class="space-y-2.5">
-        <!-- Search Input -->
+  <!-- Main View Container -->
+  <main class="max-w-md mx-auto px-3 pt-3 pb-safe">
+    
+    <!-- View 1: Inventory (在庫一覧) -->
+    <section id="view-inventory" class="space-y-3">
+      <!-- Search & Filters -->
+      <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200/80 space-y-2.5">
         <div class="relative">
-          <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
-          <input 
-            type="text" 
-            id="searchInput" 
-            placeholder="品番 (C1, 001) / 品名 / JANコード..." 
-            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-9 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition shadow-inner"
-            oninput="renderInventory()"
-          />
-          <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1">
-            <i class="ph-bold ph-x-circle text-base"></i>
-          </button>
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+          <input type="text" id="searchInput" placeholder="品番 (C1, LP-1) や品名で検索..." oninput="renderInventory()"
+            class="w-full bg-slate-50 pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        
+        <!-- Category Filter Chips -->
+        <div class="flex space-x-1.5 overflow-x-auto pb-1 text-xs no-scrollbar" id="categoryChips">
+          <button onclick="setFilterCategory('ALL')" class="cat-chip active px-3 py-1 rounded-full font-medium transition-colors bg-indigo-600 text-white shadow-sm">すべて</button>
+          <button onclick="setFilterCategory('ラッカー')" class="cat-chip px-3 py-1 rounded-full font-medium transition-colors bg-slate-100 text-slate-600">ラッカー</button>
+          <button onclick="setFilterCategory('水性')" class="cat-chip px-3 py-1 rounded-full font-medium transition-colors bg-slate-100 text-slate-600">水性</button>
+          <button onclick="setFilterCategory('エナメル')" class="cat-chip px-3 py-1 rounded-full font-medium transition-colors bg-slate-100 text-slate-600">エナメル</button>
+          <button onclick="setFilterCategory('サフ')" class="cat-chip px-3 py-1 rounded-full font-medium transition-colors bg-slate-100 text-slate-600">サフ/下地</button>
         </div>
 
-        <!-- Sort Select & In-stock quick filter -->
-        <div class="flex items-center justify-between gap-2 text-xs">
-          <div class="flex items-center gap-1.5">
-            <label class="text-slate-400 text-[11px] font-medium flex items-center gap-1">
-              <i class="ph-bold ph-arrows-down-up"></i> ソート:
-            </label>
-            <select id="sortSelect" onchange="renderInventory()" class="bg-slate-900 border border-slate-800 text-slate-200 rounded-lg px-2 py-1 text-xs focus:ring-1 focus:ring-sky-500 focus:outline-none">
-              <option value="code_asc">品番 (昇順)</option>
-              <option value="code_desc">品番 (降順)</option>
-              <option value="count_asc">残数 (少ない順)</option>
-              <option value="count_desc">残数 (多い順)</option>
-              <option value="updated_desc">更新が新しい順</option>
+        <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-xs text-slate-500">
+          <span id="inventoryCount">全 0 点</span>
+          <div class="flex items-center space-x-2">
+            <select id="sortSelect" onchange="renderInventory()" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
+              <option value="code_asc">品番順</option>
+              <option value="count_desc">数量が多い順</option>
+              <option value="count_asc">残少順</option>
+              <option value="updated_desc">最近更新順</option>
             </select>
           </div>
-
-          <label class="flex items-center gap-1.5 text-slate-400 cursor-pointer select-none">
-            <input type="checkbox" id="hideOutOfStockCheck" onchange="renderInventory()" class="rounded bg-slate-800 border-slate-700 text-sky-600 focus:ring-0">
-            <span class="text-[11px]">在庫ありのみ</span>
-          </label>
-        </div>
-
-        <!-- Filter Chips: Type -->
-        <div class="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          <button onclick="setFilterType('ALL')" id="filter-type-ALL" class="filter-type-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-sky-600 text-white transition">全種別</button>
-          <button onclick="setFilterType('ラッカー')" id="filter-type-ラッカー" class="filter-type-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">ラッカー</button>
-          <button onclick="setFilterType('水性')" id="filter-type-水性" class="filter-type-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">水性アクリル</button>
-          <button onclick="setFilterType('エナメル')" id="filter-type-エナメル" class="filter-type-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">エナメル</button>
-          <button onclick="setFilterType('サーフェイサー')" id="filter-type-サーフェイサー" class="filter-type-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">サフ・下地</button>
-          <button onclick="setFilterType('クリアー・コート')" id="filter-type-クリアー・コート" class="filter-type-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">コート剤</button>
-        </div>
-
-        <!-- Filter Chips: Maker -->
-        <div class="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          <button onclick="setFilterMaker('ALL')" id="filter-maker-ALL" class="filter-maker-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white transition">全メーカー</button>
-          <button onclick="setFilterMaker('GSIクレオス')" id="filter-maker-GSIクレオス" class="filter-maker-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">クレオス</button>
-          <button onclick="setFilterMaker('ガイアノーツ')" id="filter-maker-ガイアノーツ" class="filter-maker-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">ガイア</button>
-          <button onclick="setFilterMaker('タミヤ')" id="filter-maker-タミヤ" class="filter-maker-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">タミヤ</button>
-          <button onclick="setFilterMaker('フィニッシャーズ')" id="filter-maker-フィニッシャーズ" class="filter-maker-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">フィニッシャーズ</button>
-          <button onclick="setFilterMaker('ボーンペイント')" id="filter-maker-ボーンペイント" class="filter-maker-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">ボーンペイント</button>
-          <button onclick="setFilterMaker('シタデル')" id="filter-maker-シタデル" class="filter-maker-btn px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">シタデル</button>
         </div>
       </div>
 
-      <!-- Paint Item Cards List -->
-      <div id="paintCardsContainer" class="space-y-2.5">
-        <!-- Injected via JavaScript -->
+      <!-- Paints List -->
+      <div id="paintsListContainer" class="space-y-2">
+        <!-- Javascript renders items here -->
       </div>
+    </section>
 
-      <!-- Empty State -->
-      <div id="inventoryEmptyState" class="hidden text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
-        <div class="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-slate-600 mb-3">
-          <i class="ph-duotone ph-paint-bucket text-2xl"></i>
+    <!-- View 2: Shopping List (買い物リスト) -->
+    <section id="view-shopping" class="space-y-3 hidden">
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start space-x-3 text-amber-800">
+        <i class="fa-solid fa-cart-shopping text-lg mt-0.5 text-amber-600"></i>
+        <div class="text-xs">
+          <div class="font-bold text-amber-900">補充・購入リスト</div>
+          在庫数が「0本」になった塗料が自動的に並びます。店頭で購入したら「+1」を押してください。
         </div>
-        <h3 class="text-sm font-semibold text-slate-300">該当する塗料がありません</h3>
-        <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">条件を変えて検索するか、下のスキャナーや手動登録で塗料を追加してください。</p>
-        <button onclick="seedSampleData()" class="mt-4 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-medium rounded-xl border border-slate-700 transition inline-flex items-center gap-1.5">
-          <i class="ph-bold ph-sparkle"></i>
-          <span>定番サンプル塗料5本を追加</span>
-        </button>
       </div>
-    </div>
-
-    <!-- VIEW 2: WISHLIST (買い物リスト / 補充候補) -->
-    <div id="view-wishlist" class="view-panel space-y-4 hidden">
-      <div class="bg-gradient-to-r from-amber-950/30 to-slate-900 p-3.5 rounded-2xl border border-amber-900/30 flex items-center justify-between">
-        <div>
-          <h2 class="text-sm font-bold text-amber-200 flex items-center gap-1.5">
-            <i class="ph-bold ph-shopping-cart"></i> 買い物リスト / 補充候補
-          </h2>
-          <p class="text-[11px] text-amber-300/70 mt-0.5">在庫が0本の塗料、または補充メモした塗料です</p>
-        </div>
-        <button onclick="openRegisterModal({ count: 0 })" class="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 rounded-xl text-xs font-semibold transition flex items-center gap-1">
-          <i class="ph-bold ph-plus"></i> リスト追加
-        </button>
+      <div id="shoppingListContainer" class="space-y-2">
+        <!-- Javascript renders items here -->
       </div>
+    </section>
 
-      <!-- Wishlist Container -->
-      <div id="wishlistContainer" class="space-y-2.5">
-        <!-- Rendered via JS -->
-      </div>
-
-      <div id="wishlistEmptyState" class="hidden text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
-        <i class="ph-duotone ph-check-circle text-4xl text-emerald-500/50 mx-auto mb-2"></i>
-        <h3 class="text-sm font-semibold text-slate-300">補充が必要な塗料はありません</h3>
-        <p class="text-xs text-slate-500 mt-1">所持数が0本になると自動でここに並びます。</p>
-      </div>
-    </div>
-
-    <!-- VIEW 3: RECIPES (調色レシピ・制作ログ) -->
-    <div id="view-recipes" class="view-panel space-y-4 hidden">
+    <!-- View 3: Recipes (調色レシピ) -->
+    <section id="view-recipes" class="space-y-3 hidden">
       <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-            <i class="ph-bold ph-flask"></i> 調色レシピ・制作メモ
-          </h2>
-          <p class="text-[11px] text-slate-400 mt-0.5">キット別の塗装配合や下地レシピを記録</p>
-        </div>
-        <button onclick="openRecipeModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/20 transition flex items-center gap-1">
-          <i class="ph-bold ph-plus"></i> 新規レシピ
+        <h2 class="text-sm font-bold text-slate-800">調色レシピ・制作ログ</h2>
+        <button onclick="openRecipeModal()" class="text-xs bg-indigo-600 text-white font-medium px-3 py-1.5 rounded-lg active:bg-indigo-700 shadow-sm">
+          <i class="fa-solid fa-plus mr-1"></i>新規レシピ
         </button>
       </div>
-
-      <!-- Recipes Container -->
-      <div id="recipesContainer" class="space-y-3">
-        <!-- Rendered via JS -->
+      <div id="recipesContainer" class="space-y-2">
+        <!-- Javascript renders recipes here -->
       </div>
+    </section>
 
-      <div id="recipesEmptyState" class="hidden text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
-        <i class="ph-duotone ph-flask text-4xl text-indigo-500/50 mx-auto mb-2"></i>
-        <h3 class="text-sm font-semibold text-slate-300">レシピがまだありません</h3>
-        <p class="text-xs text-slate-500 mt-1">「MG サザビー外装赤」「RG ガンダム関節色」などの調色比率を保存できます。</p>
-      </div>
-    </div>
-
-    <!-- VIEW 4: SETTINGS & BACKUP (設定・辞書・バックアップ) -->
-    <div id="view-settings" class="view-panel space-y-4 hidden">
-      <div>
-        <h2 class="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-          <i class="ph-bold ph-gear"></i> 設定・データ管理
-        </h2>
-        <p class="text-[11px] text-slate-400 mt-0.5">バックアップ・辞書管理・デバッグツール</p>
-      </div>
-
-      <!-- Learned Custom JAN Dictionary Section -->
-      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
-              <i class="ph-bold ph-books text-sky-400"></i> 学習済みカスタムJAN辞書
-            </h3>
-            <p class="text-[11px] text-slate-400">スキャン時に手動入力で自動学習されたバーコード情報</p>
+    <!-- View 4: Settings & Data Tools (設定・外部連携) -->
+    <section id="view-settings" class="space-y-3 hidden">
+      <!-- Yahoo API Settings Box -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+        <div class="flex items-center space-x-2 text-indigo-700 font-bold text-sm">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+          <span>Yahoo!ショッピング API 自動補完設定</span>
+        </div>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          未知のJANコードをスキャンした際、Yahoo!ショッピングから品名・メーカーを自動取得します。LINEヤフーで取得したClient ID（App ID）を登録してください。
+        </p>
+        <div class="space-y-1.5">
+          <label class="text-[11px] font-bold text-slate-500">Yahoo! Client ID (App ID)</label>
+          <div class="flex space-x-1.5">
+            <input type="text" id="yahooAppIdInput" placeholder="dj00aiZpP..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500">
+            <button onclick="saveYahooAppId()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold active:bg-indigo-700">保存</button>
           </div>
-          <span id="customDictCountBadge" class="text-xs font-mono font-bold text-sky-400 bg-sky-950 px-2 py-0.5 rounded-lg border border-sky-800/40">0件</span>
-        </div>
-        <div id="customDictListPreview" class="max-h-36 overflow-y-auto space-y-1.5 text-xs no-scrollbar text-slate-300">
-          <!-- Dictionary preview items -->
         </div>
       </div>
 
-      <!-- Data Backup / Export / Import -->
-      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-        <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
-          <i class="ph-bold ph-cloud-arrow-down text-emerald-400"></i> データバックアップ・復元
-        </h3>
-        <p class="text-[11px] text-slate-400">全塗料、買い物リスト、調色レシピ、カスタム辞書をJSONファイルでまとめて出力・共有します。</p>
-
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+        <h2 class="text-sm font-bold text-slate-800 flex items-center space-x-2">
+          <i class="fa-solid fa-database text-indigo-600"></i>
+          <span>データ管理・バックアップ</span>
+        </h2>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          データはすべてお使いのスマートフォン内部（IndexedDB）に保存されます。機種変更や友人との共有にエクスポートをご利用ください。
+        </p>
         <div class="grid grid-cols-2 gap-2 pt-1">
-          <button onclick="exportAllDataJSON()" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-sky-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
-            <i class="ph-bold ph-download-simple text-sm"></i> JSONエクスポート
+          <button onclick="exportDataJSON()" class="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+            <i class="fa-solid fa-download"></i>
+            <span>JSON保存</span>
           </button>
-
-          <label class="cursor-pointer py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-center">
-            <i class="ph-bold ph-upload-simple text-sm"></i> JSONインポート
-            <input type="file" id="importJsonFileInput" accept=".json" class="hidden" onchange="importAllDataJSON(event)">
+          <label class="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer">
+            <i class="fa-solid fa-upload"></i>
+            <span>JSON読込</span>
+            <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="importDataJSON(event)">
           </label>
         </div>
       </div>
 
-      <!-- Seed & Clear DB -->
-      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-        <h3 class="text-xs font-bold text-white">開発・デバッグ用操作</h3>
-        <div class="flex flex-col gap-2">
-          <button onclick="seedSampleData()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-semibold transition text-left px-3 flex items-center justify-between">
-            <span>定番サンプル塗料・レシピを投入</span>
-            <i class="ph-bold ph-sparkle text-sky-400"></i>
-          </button>
-          <button onclick="clearAllData()" class="w-full py-2 bg-rose-950/20 hover:bg-rose-900/30 text-rose-300 border border-rose-900/40 rounded-xl text-xs font-semibold transition text-left px-3 flex items-center justify-between">
-            <span>すべてのデータを初期化（全消去）</span>
-            <i class="ph-bold ph-trash text-rose-400"></i>
-          </button>
-        </div>
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+        <h3 class="text-xs font-bold text-slate-700">初期化・テスト支援</h3>
+        <button onclick="seedTamiyaDemo()" class="w-full text-left py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 flex justify-between items-center">
+          <span>タミヤラッカー定番5色をサンプル投入</span>
+          <i class="fa-solid fa-chevron-right text-slate-400 text-[10px]"></i>
+        </button>
+        <button onclick="clearAllData()" class="w-full text-left py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-medium text-rose-700 flex justify-between items-center">
+          <span>全データをリセット</span>
+          <i class="fa-solid fa-trash text-rose-500 text-[10px]"></i>
+        </button>
       </div>
-
-    </div>
+    </section>
 
   </main>
 
-  <!-- Bottom Global Navigation Bar (Mobile Optimized) -->
-  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/80 safe-bottom">
-    <div class="max-w-2xl mx-auto px-2 py-1.5 flex items-center justify-around relative">
+  <!-- Bottom Navigation Bar -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 max-w-md mx-auto">
+    <div class="flex items-center justify-around py-1.5 px-2">
+      <button onclick="switchTab('inventory')" id="nav-inventory" class="nav-item flex-1 flex flex-col items-center py-1 text-indigo-600 font-bold">
+        <i class="fa-solid fa-boxes-stacked text-lg"></i>
+        <span class="text-[10px] mt-0.5">在庫</span>
+      </button>
+      <button onclick="switchTab('shopping')" id="nav-shopping" class="nav-item flex-1 flex flex-col items-center py-1 text-slate-400">
+        <div class="relative">
+          <i class="fa-solid fa-cart-shopping text-lg"></i>
+          <span id="badge-shopping" class="hidden absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">0</span>
+        </div>
+        <span class="text-[10px] mt-0.5">買物</span>
+      </button>
       
-      <!-- Nav 1: Inventory -->
-      <button onclick="switchView('inventory')" id="nav-btn-inventory" class="nav-btn flex-1 py-1.5 flex flex-col items-center gap-1 text-sky-400 transition">
-        <i class="ph-fill ph-paint-bucket text-xl"></i>
-        <span class="text-[10px] font-bold">在庫一覧</span>
-      </button>
-
-      <!-- Nav 2: Wishlist -->
-      <button onclick="switchView('wishlist')" id="nav-btn-wishlist" class="nav-btn flex-1 py-1.5 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition relative">
-        <i class="ph-bold ph-shopping-cart text-xl"></i>
-        <span class="text-[10px] font-bold">買物リスト</span>
-        <span id="navWishlistDot" class="hidden absolute top-1 right-1/4 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-slate-950"></span>
-      </button>
-
-      <!-- Center FAB: Scanner -->
-      <div class="relative -top-3.5 px-1">
-        <button 
-          onclick="openScannerModal()" 
-          class="w-14 h-14 rounded-full bg-gradient-to-tr from-sky-500 via-indigo-600 to-sky-400 text-white shadow-lg shadow-sky-500/40 flex items-center justify-center active:scale-90 transition transform"
-          title="バーコードをスキャン"
-        >
-          <i class="ph-bold ph-barcode text-2xl"></i>
+      <!-- Central Floating Camera Button -->
+      <div class="flex-1 flex justify-center -mt-5">
+        <button onclick="openScanModal()" class="w-13 h-13 p-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg border-4 border-slate-100 active:scale-95 transition-transform flex items-center justify-center">
+          <i class="fa-solid fa-barcode text-xl"></i>
         </button>
       </div>
 
-      <!-- Nav 3: Recipe -->
-      <button onclick="switchView('recipes')" id="nav-btn-recipes" class="nav-btn flex-1 py-1.5 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition">
-        <i class="ph-bold ph-flask text-xl"></i>
-        <span class="text-[10px] font-bold">調色メモ</span>
+      <button onclick="switchTab('recipes')" id="nav-recipes" class="nav-item flex-1 flex flex-col items-center py-1 text-slate-400">
+        <i class="fa-solid fa-palette text-lg"></i>
+        <span class="text-[10px] mt-0.5">レシピ</span>
       </button>
-
-      <!-- Nav 4: Settings -->
-      <button onclick="switchView('settings')" id="nav-btn-settings" class="nav-btn flex-1 py-1.5 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition">
-        <i class="ph-bold ph-gear text-xl"></i>
-        <span class="text-[10px] font-bold">設定</span>
+      <button onclick="switchTab('settings')" id="nav-settings" class="nav-item flex-1 flex flex-col items-center py-1 text-slate-400">
+        <i class="fa-solid fa-sliders text-lg"></i>
+        <span class="text-[10px] mt-0.5">設定</span>
       </button>
-
     </div>
   </nav>
 
-  <!-- ========================================================
-       MODAL 1: Barcode Scanner with Batch Mode & Torch
-       ======================================================== -->
-  <div id="scannerModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center p-0 sm:p-4">
-    <div class="bg-slate-900 border border-slate-700 sm:rounded-2xl rounded-t-3xl max-w-lg w-full mx-auto overflow-hidden shadow-2xl flex flex-col max-h-[94vh]">
-      
-      <!-- Scanner Header -->
-      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-        <div class="flex items-center gap-2">
-          <i class="ph-bold ph-scan text-sky-400 text-lg"></i>
-          <span class="text-sm font-bold text-white">JANコードスキャナー</span>
+  <!-- Modal: Scanner (スキャナー) -->
+  <div id="scanModal" class="fixed inset-0 z-50 bg-black/80 flex flex-col justify-end hidden">
+    <div class="bg-white rounded-t-3xl p-4 max-w-md w-full mx-auto max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center space-x-2">
+          <h2 class="text-sm font-bold text-slate-800">バーコードスキャン</h2>
+          <span id="apiStatusBadge" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">Yahoo!検索: 未設定</span>
         </div>
-        <button onclick="closeScannerModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
-          <i class="ph-bold ph-x text-lg"></i>
+        <button onclick="closeScanModal()" class="text-slate-400 text-lg w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <!-- Scanner Viewport Area -->
-      <div class="p-4 flex-1 flex flex-col items-center">
+      <!-- Batch Mode Switch -->
+      <div class="flex items-center justify-between py-2 text-xs text-slate-600">
+        <span>連続スキャンモード (自動で+1)</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="batchScanToggle" class="sr-only peer">
+          <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+        </label>
+      </div>
+
+      <!-- Camera Preview Box -->
+      <div class="relative w-full aspect-square bg-slate-900 rounded-2xl overflow-hidden my-2 flex items-center justify-center">
+        <div id="reader" class="w-full h-full"></div>
+        <!-- Scan Target Reticle -->
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div class="w-3/4 h-32 border-2 border-indigo-400/80 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+            <span class="text-white/80 text-[11px] font-mono tracking-wider drop-shadow">JANコードを枠内に</span>
+          </div>
+        </div>
+        <!-- Loading Spinner for API -->
+        <div id="apiLoadingOverlay" class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white space-y-2 hidden">
+          <div class="w-8 h-8 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
+          <span class="text-xs font-semibold">Yahoo!商品情報を照会中...</span>
+        </div>
+      </div>
+
+      <!-- Last Scanned Live Card -->
+      <div id="lastScannedBox" class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1 hidden">
+        <div class="flex justify-between items-center">
+          <span class="font-bold text-slate-700" id="scanResultTitle">塗料名</span>
+          <span class="text-indigo-600 font-bold" id="scanResultCount">所持: 1本</span>
+        </div>
+        <p class="text-[11px] text-slate-500" id="scanResultMeta">C1 / GSIクレオス / ラッカー</p>
+      </div>
+
+      <div class="pt-2 text-center">
+        <button onclick="stopScanner(); openManualModal();" class="text-xs text-indigo-600 font-semibold underline">
+          読み取れない場合は手動で入力
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Manual Add / Edit Form -->
+  <div id="manualModal" class="fixed inset-0 z-50 bg-black/70 flex flex-col justify-end hidden">
+    <div class="bg-white rounded-t-3xl p-5 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h2 class="text-sm font-bold text-slate-800" id="modalFormTitle">塗料の登録 / 編集</h2>
+        <button onclick="closeManualModal()" class="text-slate-400 text-lg w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="paintForm" onsubmit="handleSavePaint(event)" class="space-y-3 pt-3">
+        <input type="hidden" id="form-id">
         
-        <!-- Batch Scan Mode Toggle Bar -->
-        <div class="w-full max-w-xs mb-3 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <i class="ph-bold ph-arrows-merge text-sky-400"></i>
-            <div>
-              <span class="text-xs font-bold text-white block leading-tight">連続スキャンモード</span>
-              <span class="text-[10px] text-slate-400">カメラを閉じず自動で+1本</span>
-            </div>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="batchScanToggle" class="sr-only peer" onchange="toggleBatchMode()">
-            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
-          </label>
-        </div>
-
-        <!-- Scanner Camera Box -->
-        <div id="qr-reader" class="rounded-2xl overflow-hidden bg-black aspect-square max-w-xs w-full relative flex items-center justify-center border border-slate-700 shadow-inner">
-          <!-- Video mounted here -->
-        </div>
-
-        <p class="text-xs text-slate-400 mt-3 text-center">
-          塗料瓶のバーコードを枠内に捉えてください。<br>
-          <span class="text-[11px] text-slate-500">※iPhoneは少し離して（20cm程）かざすとピントが合いやすいです</span>
-        </p>
-
-        <!-- Controls: Torch & Manual Code -->
-        <div class="flex gap-2 mt-3.5">
-          <button id="torchToggleBtn" onclick="toggleTorch()" class="hidden px-3 py-1.5 bg-slate-800 text-xs rounded-xl border border-slate-700 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5 transition">
-            <i id="torchIcon" class="ph-bold ph-flashlight"></i> ライト
-          </button>
-          <button onclick="manualCodePrompt()" class="px-3.5 py-1.5 bg-slate-800 text-xs rounded-xl border border-slate-700 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 transition">
-            <i class="ph-bold ph-keyboard"></i> JANコード直打ち
-          </button>
-        </div>
-
-        <!-- Batch Scan Counter Feedback -->
-        <div id="batchCounterBadge" class="hidden mt-3 px-3 py-1 bg-sky-950/80 border border-sky-600/40 rounded-full text-xs text-sky-300 font-mono font-bold">
-          今回の連続スキャン: <span id="batchCountNum">0</span>本 処理済
-        </div>
-
-      </div>
-
-      <!-- Scanner Footer -->
-      <div class="p-3 border-t border-slate-800 bg-slate-900 flex justify-end">
-        <button onclick="closeScannerModal()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
-          閉じる
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ========================================================
-       MODAL 2: Paint Register & Edit (with Custom JAN Learning)
-       ======================================================== -->
-  <div id="registerModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center p-0 sm:p-4">
-    <div class="bg-slate-900 border border-slate-700 sm:rounded-2xl rounded-t-3xl max-w-md w-full mx-auto overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
-      
-      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
-        <div class="flex items-center gap-2">
-          <i class="ph-bold ph-paint-bucket text-sky-400 text-lg"></i>
-          <span id="registerModalTitle" class="text-sm font-bold text-white">塗料の登録 / 編集</span>
-        </div>
-        <button onclick="closeRegisterModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
-          <i class="ph-bold ph-x text-lg"></i>
-        </button>
-      </div>
-
-      <!-- Form Body -->
-      <form id="paintForm" onsubmit="handleFormSubmit(event)" class="p-4 space-y-3.5 overflow-y-auto flex-1 text-xs">
-        <input type="hidden" id="formPaintId">
-
-        <!-- Duplicate warning alert banner -->
-        <div id="duplicateAlert" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-xs flex items-start gap-2.5">
-          <i class="ph-fill ph-warning-circle text-lg flex-shrink-0 mt-0.5 text-amber-400"></i>
-          <div class="flex-1 leading-snug">
-            <p class="font-bold">既に在庫が存在します！</p>
-            <p id="duplicateAlertMsg" class="mt-0.5 text-amber-300/80 text-[11px]"></p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <!-- Maker Selection -->
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1">メーカー *</label>
-            <select id="formMaker" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
-              <option value="GSIクレオス">GSIクレオス (Mr.カラー)</option>
-              <option value="ガイアノーツ">ガイアノーツ (ガイアカラー)</option>
-              <option value="タミヤ">タミヤ (Tamiya)</option>
-              <option value="フィニッシャーズ">フィニッシャーズ</option>
-              <option value="ボーンペイント">ボーンペイント</option>
-              <option value="シタデル">シタデル (Citadel)</option>
-              <option value="その他">その他</option>
-            </select>
-          </div>
-
-          <!-- Paint Type -->
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1">塗料種別 *</label>
-            <select id="formType" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
-              <option value="ラッカー">ラッカー (溶剤系)</option>
-              <option value="水性">水性アクリル</option>
-              <option value="エナメル">エナメル</option>
-              <option value="サーフェイサー">下地・サフ</option>
-              <option value="クリアー・コート">コート・トップコート</option>
-              <option value="その他">その他</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-          <!-- Product Code -->
-          <div class="col-span-1">
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1">品番 *</label>
-            <input 
-              type="text" 
-              id="formProductCode" 
-              placeholder="C1, 001" 
-              required
-              onblur="checkDuplicateRealtime()"
-              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs text-white uppercase focus:ring-2 focus:ring-sky-500 focus:outline-none font-mono"
-            >
-          </div>
-
-          <!-- Name -->
-          <div class="col-span-2">
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1">品名 / 色名 *</label>
-            <input 
-              type="text" 
-              id="formName" 
-              placeholder="ホワイト (光沢)" 
-              required 
-              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs text-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
-            >
-          </div>
-        </div>
-
-        <!-- JAN Code -->
-        <div>
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">JANコード (13桁)</label>
-          <div class="relative">
-            <input 
-              type="text" 
-              id="formJan" 
-              placeholder="4973028531008 (任意)" 
-              onblur="checkDuplicateRealtime()"
-              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs text-white font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none"
-            >
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-medium">バーコード値</span>
-          </div>
-          <!-- Learning notice checkbox -->
-          <label class="flex items-center gap-1.5 mt-1.5 text-[11px] text-sky-300 select-none">
-            <input type="checkbox" id="formSaveToDictCheck" checked class="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0">
-            <span>この品番・品名をカスタムJAN辞書に記憶する</span>
-          </label>
-        </div>
-
-        <!-- Stock Quantity -->
-        <div>
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">所持本数 (0本の場合は買物リストへ)</label>
-          <div class="flex items-center gap-3">
-            <button type="button" onclick="adjustFormQty(-1)" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold hover:bg-slate-700 active:scale-95 text-base flex items-center justify-center">-</button>
-            <input 
-              type="number" 
-              id="formCount" 
-              min="0" 
-              value="1" 
-              required
-              class="w-20 text-center bg-slate-800 border border-slate-700 rounded-xl py-2.5 text-base font-bold text-white focus:ring-2 focus:ring-sky-500 focus:outline-none font-mono"
-            >
-            <button type="button" onclick="adjustFormQty(1)" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold hover:bg-slate-700 active:scale-95 text-base flex items-center justify-center">+</button>
-            <span class="text-xs text-slate-400 font-medium">本ストック</span>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="pt-3 border-t border-slate-800 flex gap-2">
-          <button type="button" onclick="closeRegisterModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition">
-            キャンセル
-          </button>
-          <button type="submit" class="flex-1 py-2.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-sky-600/30 transition">
-            保存する
-          </button>
-        </div>
-      </form>
-
-    </div>
-  </div>
-
-  <!-- ========================================================
-       MODAL 3: Color Mixing Recipe Editor (調色レシピ)
-       ======================================================== -->
-  <div id="recipeModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center p-0 sm:p-4">
-    <div class="bg-slate-900 border border-slate-700 sm:rounded-2xl rounded-t-3xl max-w-md w-full mx-auto overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
-      
-      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
-        <div class="flex items-center gap-2">
-          <i class="ph-bold ph-flask text-indigo-400 text-lg"></i>
-          <span id="recipeModalTitle" class="text-sm font-bold text-white">調色レシピの作成</span>
-        </div>
-        <button onclick="closeRecipeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
-          <i class="ph-bold ph-x text-lg"></i>
-        </button>
-      </div>
-
-      <!-- Recipe Form -->
-      <form id="recipeForm" onsubmit="handleRecipeSubmit(event)" class="p-4 space-y-3.5 overflow-y-auto flex-1 text-xs">
-        <input type="hidden" id="recipeId">
-
-        <div>
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">レシピ名 (色名) *</label>
-          <input type="text" id="recipeTitle" required placeholder="例: ザク本体ダークグリーン" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        <!-- Duplicate Alert Banner -->
+        <div id="duplicateAlert" class="bg-amber-50 border border-amber-300 text-amber-800 px-3 py-2 rounded-xl text-xs flex items-center justify-between hidden">
+          <span id="duplicateAlertText"><i class="fa-solid fa-triangle-exclamation mr-1"></i>すでに在庫に存在します</span>
         </div>
 
         <div>
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">対象キット / 部位</label>
-          <input type="text" id="recipeKit" placeholder="例: MG ザクII Ver.2.0 (装甲部)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-        </div>
-
-        <!-- Recipe Ingredients (Paints & Ratios) -->
-        <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label class="text-[11px] font-semibold text-slate-400">使用塗料・配合比率</label>
-            <button type="button" onclick="addRecipeIngredientRow()" class="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-0.5">
-              <i class="ph-bold ph-plus"></i> 塗料追加
+          <label class="text-[11px] font-bold text-slate-500">JANコード (バーコード)</label>
+          <div class="flex space-x-1.5 mt-0.5">
+            <input type="text" id="form-jan" oninput="checkDuplicateJan()" placeholder="4950344..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
+            <button type="button" onclick="triggerYahooSearchFromInput()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold">
+              <i class="fa-solid fa-magnifying-glass mr-1"></i>Yahoo!照会
             </button>
           </div>
-          <div id="recipeIngredientsList" class="space-y-2">
-            <!-- Dynamic ingredient rows -->
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">メーカー</label>
+            <select id="form-maker" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
+              <option value="タミヤ">タミヤ</option>
+              <option value="GSIクレオス">GSIクレオス</option>
+              <option value="ガイアノーツ">ガイアノーツ</option>
+              <option value="ボーンペイント">ボーンペイント</option>
+              <option value="フィニッシャーズ">フィニッシャーズ</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">塗料タイプ</label>
+            <select id="form-category" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
+              <option value="ラッカー">ラッカー</option>
+              <option value="水性">水性 / アクリル</option>
+              <option value="エナメル">エナメル</option>
+              <option value="サフ">サーフェイサー</option>
+              <option value="コート">トップコート</option>
+              <option value="その他">その他</option>
+            </select>
           </div>
         </div>
 
-        <div>
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">下地・希釈・塗装メモ</label>
-          <textarea id="recipeNotes" rows="2" placeholder="例: 黒サフ下地、レベリング薄め液で1:1.5希釈。エアブラシ圧0.08MPa" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="col-span-1">
+            <label class="text-[11px] font-bold text-slate-500">品番 (Code)</label>
+            <input type="text" id="form-code" placeholder="LP-1, C1" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div class="col-span-2">
+            <label class="text-[11px] font-bold text-slate-500">品名 (Color Name)</label>
+            <input type="text" id="form-name" required placeholder="ホワイト, ジャーマングレイ" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
+          </div>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 flex gap-2">
-          <button type="button" onclick="closeRecipeModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
-            キャンセル
-          </button>
-          <button type="submit" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30">
-            レシピ保存
-          </button>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">所持本数</label>
+            <div class="flex items-center space-x-2 mt-0.5">
+              <button type="button" onclick="adjustFormCount(-1)" class="w-8 h-8 rounded-lg bg-slate-100 font-bold text-slate-600">-</button>
+              <input type="number" id="form-count" value="1" min="0" class="w-12 text-center bg-slate-50 border border-slate-200 rounded-lg py-1.5 text-xs font-bold">
+              <button type="button" onclick="adjustFormCount(1)" class="w-8 h-8 rounded-lg bg-slate-100 font-bold text-slate-600">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">保管場所メモ</label>
+            <input type="text" id="form-location" placeholder="机の引き出し, ラックA" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="pt-2 flex space-x-2">
+          <button type="button" onclick="closeManualModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600">キャンセル</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold active:bg-indigo-700 shadow-sm">保存する</button>
         </div>
       </form>
-
     </div>
   </div>
 
-  <!-- Toast Notification Box -->
-  <div id="toastBox" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 transform -translate-y-24 opacity-0 transition-all duration-300 pointer-events-none max-w-sm w-11/12">
-    <div id="toastContent" class="px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 text-xs font-medium">
-      <i id="toastIcon" class="ph-bold ph-check-circle text-base"></i>
-      <span id="toastMsg" class="flex-1"></span>
+  <!-- Modal: Recipe Form -->
+  <div id="recipeModal" class="fixed inset-0 z-50 bg-black/70 flex flex-col justify-end hidden">
+    <div class="bg-white rounded-t-3xl p-5 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h2 class="text-sm font-bold text-slate-800">調色レシピの記録</h2>
+        <button onclick="closeRecipeModal()" class="text-slate-400 text-lg w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="recipeForm" onsubmit="handleSaveRecipe(event)" class="space-y-3 pt-3">
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">作成キット / パーツ名</label>
+          <input type="text" id="recipe-kit" required placeholder="例: RG 1/144 RX-78-2 外装白" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+        </div>
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">配合レシピ</label>
+          <textarea id="recipe-formula" required rows="3" placeholder="・LP-2 ホワイト: 80%&#10;・LP-39 レーシングホワイト: 20%&#10;・下地: オキサイドレッドサフ" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs"></textarea>
+        </div>
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">希釈・備考</label>
+          <input type="text" id="recipe-note" placeholder="レベリングうすめ液で 1 : 1.5希釈" class="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+        </div>
+        <div class="pt-2 flex space-x-2">
+          <button type="button" onclick="closeRecipeModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600">キャンセル</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold">レシピ保存</button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <!-- Application Logic -->
+  <!-- APPLICATION LOGIC -->
   <script>
-    /* ========================================================
-       1. Database Architecture (Dexie.js IndexedDB)
-       ======================================================== */
-    const db = new Dexie("PlamoPaintProDB");
-    db.version(2).stores({
-      paints: "++id, maker, productCode, name, type, jan, count, updatedAt",
-      customDict: "jan, maker, productCode, name, type, learnedAt",
-      recipes: "++id, title, kit, notes, updatedAt"
+    // --- 1. Database Initialization (Dexie.js) ---
+    const db = new Dexie("PlamoPaintDB_v2");
+    db.version(1).stores({
+      paints: "++id, jan, maker, code, name, category, count, location, updatedAt",
+      recipes: "++id, kit, formula, note, createdAt",
+      customDict: "jan, maker, code, name, category"
     });
 
-    // Built-in standard JAN catalog for popular modeling paints
-    const BUILTIN_JAN_CATALOG = {
-      "4973028531008": { maker: "GSIクレオス", productCode: "C1", name: "ホワイト (白)", type: "ラッカー" },
-      "4973028531015": { maker: "GSIクレオス", productCode: "C2", name: "ブラック (黒)", type: "ラッカー" },
-      "4973028531022": { maker: "GSIクレオス", productCode: "C3", name: "レッド (赤)", type: "ラッカー" },
-      "4973028531039": { maker: "GSIクレオス", productCode: "C4", name: "イエロー (黄)", type: "ラッカー" },
-      "4973028531046": { maker: "GSIクレオス", productCode: "C5", name: "ブルー (青)", type: "ラッカー" },
-      "4973028531121": { maker: "GSIクレオス", productCode: "C13", name: "ニュートラルグレー", type: "ラッカー" },
-      "4973028531336": { maker: "GSIクレオス", productCode: "C33", name: "つや消しブラック", type: "ラッカー" },
-      "4973028531466": { maker: "GSIクレオス", productCode: "C46", name: "クリアー", type: "ラッカー" },
-      "4973028532821": { maker: "GSIクレオス", productCode: "GX1", name: "GXクールホワイト", type: "ラッカー" },
-      "4973028532838": { maker: "GSIクレオス", productCode: "GX2", name: "GXウイノーブラック", type: "ラッカー" },
-      "4571180810017": { maker: "ガイアノーツ", productCode: "001", name: "アルティメットホワイト", type: "ラッカー" },
-      "4571180810024": { maker: "ガイアノーツ", productCode: "002", name: "ピュアブラック", type: "ラッカー" },
-      "4571180810031": { maker: "ガイアノーツ", productCode: "003", name: "ブライトレッド", type: "ラッカー" },
-      "4571180810048": { maker: "ガイアノーツ", productCode: "004", name: "ウルトラブルー", type: "ラッカー" },
-      "4571180810055": { maker: "ガイアノーツ", productCode: "005", name: "サンシャインイエロー", type: "ラッカー" },
-      "4571180810727": { maker: "ガイアノーツ", productCode: "072", name: "ニュートラルグレーII", type: "ラッカー" },
-      "4571180810734": { maker: "ガイアノーツ", productCode: "073", name: "ニュートラルグレーIII", type: "ラッカー" },
-      "4571180810109": { maker: "ガイアノーツ", productCode: "Ex-01", name: "Ex-ホワイト", type: "ラッカー" },
-      "4571180810116": { maker: "ガイアノーツ", productCode: "Ex-02", name: "Ex-ブラック", type: "ラッカー" },
-      "4571180810130": { maker: "ガイアノーツ", productCode: "Ex-03", name: "Ex-クリアー", type: "ラッカー" },
-      "4950344813018": { maker: "タミヤ", productCode: "X-1", name: "ブラック", type: "エナメル" },
-      "4950344813025": { maker: "タミヤ", productCode: "X-2", name: "ホワイト", type: "エナメル" },
-      "4950344817016": { maker: "タミヤ", productCode: "XF-1", name: "フラットブラック", type: "エナメル" },
-      "4950344817023": { maker: "タミヤ", productCode: "XF-2", name: "フラットホワイト", type: "エナメル" },
-      "4973028535013": { maker: "GSIクレオス", productCode: "H1", name: "水性ホビーカラー ホワイト", type: "水性" },
-      "4973028535020": { maker: "GSIクレオス", productCode: "H2", name: "水性ホビーカラー ブラック", type: "水性" }
-    };
+    let currentFilterCategory = "ALL";
+    let html5QrCode = null;
+    let isScanning = false;
+    let yahooAppId = localStorage.getItem("YAHOO_APP_ID") || "";
 
-    // State Variables
-    let currentActiveView = 'inventory';
-    let currentFilterType = 'ALL';
-    let currentFilterMaker = 'ALL';
-    let html5QrScanner = null;
-    let isTorchOn = false;
-    let isBatchScanMode = false;
-    let batchScanCount = 0;
-    let lastScannedCode = null;
-    let lastScannedTime = 0;
+    // --- Audio Feedback ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq = 880, duration = 0.1) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+      if (navigator.vibrate) navigator.vibrate(60);
+    }
 
-    /* ========================================================
-       2. Audio & Haptics & Notification Helpers
-       ======================================================== */
-    function playBeep(type = 'success') {
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.remove("opacity-0", "pointer-events-none");
+      setTimeout(() => t.classList.add("opacity-0", "pointer-events-none"), 2200);
+    }
+
+    // --- 2. Yahoo! Shopping API Helper ---
+    async function queryYahooPaint(janCode) {
+      if (!yahooAppId) return null;
+      const overlay = document.getElementById("apiLoadingOverlay");
+      overlay.classList.remove("hidden");
+
       try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        const targetUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&jan_code=${encodeURIComponent(janCode)}&results=1`;
+        // CORS proxy
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
         
-        if (type === 'success') {
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.12);
-        } else if (type === 'duplicate') {
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-          osc.frequency.setValueAtTime(330, audioCtx.currentTime + 0.1);
-          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.25);
-        } else {
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.2);
+        const res = await fetch(proxyUrl);
+        const data = await res.json();
+        
+        if (data.hits && data.hits.length > 0) {
+          const item = data.hits[0];
+          const rawTitle = item.name || "";
+          
+          let maker = "その他";
+          if (rawTitle.includes("クレオス") || rawTitle.includes("Mr.")) maker = "GSIクレオス";
+          else if (rawTitle.includes("タミヤ")) maker = "タミヤ";
+          else if (rawTitle.includes("ガイア")) maker = "ガイアノーツ";
+
+          let category = "その他";
+          if (rawTitle.includes("水性") || rawTitle.includes("アクリル")) category = "水性";
+          else if (rawTitle.includes("ラッカー") || rawTitle.includes("Mr.カラー") || rawTitle.includes("LP-")) category = "ラッカー";
+          else if (rawTitle.includes("エナメル")) category = "エナメル";
+          else if (rawTitle.includes("サーフェイサー") || rawTitle.includes("サフ")) category = "サフ";
+
+          // 品番抽出 (C1, LP-1, H-1 など)
+          let code = "";
+          const codeMatch = rawTitle.match(/\b([A-Z]{1,3}[-_]?\d{1,4}[A-Z]?)\b/);
+          if (codeMatch) code = codeMatch[1];
+
+          let cleanName = rawTitle.replace(/【.*?】|\[.*?\]|（.*?）|\(.*?\)|新品|塗料|GSIクレオス|タミヤ/g, "").trim();
+
+          return {
+            jan: janCode,
+            maker,
+            code,
+            name: cleanName || rawTitle,
+            category
+          };
         }
-      } catch (e) {}
-
-      if (navigator.vibrate) {
-        if (type === 'success') navigator.vibrate([40, 25, 40]);
-        else if (type === 'duplicate') navigator.vibrate([80, 50, 80]);
-        else navigator.vibrate(120);
-      }
-    }
-
-    function showToast(msg, type = 'success') {
-      const box = document.getElementById('toastBox');
-      const content = document.getElementById('toastContent');
-      const text = document.getElementById('toastMsg');
-      const icon = document.getElementById('toastIcon');
-
-      text.textContent = msg;
-
-      if (type === 'success') {
-        content.className = "px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 text-xs font-semibold bg-emerald-950/95 text-emerald-200 border-emerald-500/40 backdrop-blur-md";
-        icon.className = "ph-bold ph-check-circle text-base text-emerald-400";
-      } else if (type === 'warn') {
-        content.className = "px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 text-xs font-semibold bg-amber-950/95 text-amber-200 border-amber-500/40 backdrop-blur-md";
-        icon.className = "ph-fill ph-warning-circle text-base text-amber-400";
-      } else {
-        content.className = "px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 text-xs font-semibold bg-rose-950/95 text-rose-200 border-rose-500/40 backdrop-blur-md";
-        icon.className = "ph-bold ph-x-circle text-base text-rose-400";
-      }
-
-      box.classList.remove('-translate-y-24', 'opacity-0');
-      box.classList.add('translate-y-0', 'opacity-100');
-
-      setTimeout(() => {
-        box.classList.remove('translate-y-0', 'opacity-100');
-        box.classList.add('-translate-y-24', 'opacity-0');
-      }, 3200);
-    }
-
-    /* ========================================================
-       3. View Switching (Bottom Nav)
-       ======================================================== */
-    function switchView(viewName) {
-      currentActiveView = viewName;
-      document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden'));
-      const activePanel = document.getElementById(`view-${viewName}`);
-      if (activePanel) activePanel.classList.remove('hidden');
-
-      // Update Nav Button Colors
-      document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.remove('text-sky-400');
-        btn.classList.add('text-slate-400');
-      });
-      const activeBtn = document.getElementById(`nav-btn-${viewName}`);
-      if (activeBtn) {
-        activeBtn.classList.remove('text-slate-400');
-        activeBtn.classList.add('text-sky-400');
-      }
-
-      if (viewName === 'inventory') renderInventory();
-      if (viewName === 'wishlist') renderWishlist();
-      if (viewName === 'recipes') renderRecipes();
-      if (viewName === 'settings') renderSettings();
-    }
-
-    /* ========================================================
-       4. Barcode Scanning with Batch Mode & JAN Lookup
-       ======================================================== */
-    function toggleBatchMode() {
-      isBatchScanMode = document.getElementById('batchScanToggle').checked;
-      document.getElementById('batchCounterBadge').classList.toggle('hidden', !isBatchScanMode);
-      if (isBatchScanMode) {
-        showToast("連続スキャンが有効です。読み取り後もカメラを継続します", "success");
-      }
-    }
-
-    function openScannerModal() {
-      document.getElementById('scannerModal').classList.remove('hidden');
-      document.getElementById('scannerModal').classList.add('flex');
-      batchScanCount = 0;
-      document.getElementById('batchCountNum').innerText = "0";
-      startScanner();
-    }
-
-    function closeScannerModal() {
-      stopScanner();
-      document.getElementById('scannerModal').classList.add('hidden');
-      document.getElementById('scannerModal').classList.remove('flex');
-      renderAllViews();
-    }
-
-    async function startScanner() {
-      if (html5QrScanner) return;
-
-      html5QrScanner = new Html5Qrcode("qr-reader");
-      const config = {
-        fps: 15,
-        qrbox: { width: 250, height: 160 },
-        aspectRatio: 1.0,
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.UPC_A
-        ]
-      };
-
-      try {
-        await html5QrScanner.start(
-          { facingMode: "environment" },
-          config,
-          onScanSuccess,
-          () => {} // Suppress noisy periodic misses
-        );
-
-        // Torch check
-        try {
-          const track = html5QrScanner.getRunningTrackCapabilities();
-          if (track && track.torch) {
-            document.getElementById('torchToggleBtn').classList.remove('hidden');
-          }
-        } catch(e) {}
       } catch (err) {
-        console.error("Camera error", err);
-        showToast("カメラ起動に失敗しました。カメラ権限を確認してください", "error");
+        console.warn("Yahoo API lookup failed:", err);
+      } finally {
+        overlay.classList.add("hidden");
       }
-    }
-
-    async function stopScanner() {
-      if (html5QrScanner) {
-        try {
-          await html5QrScanner.stop();
-          html5QrScanner.clear();
-        } catch (e) {}
-        html5QrScanner = null;
-      }
-    }
-
-    async function toggleTorch() {
-      if (!html5QrScanner) return;
-      isTorchOn = !isTorchOn;
-      try {
-        await html5QrScanner.applyVideoConstraints({ advanced: [{ torch: isTorchOn }] });
-        document.getElementById('torchIcon').className = isTorchOn ? "ph-fill ph-flashlight text-amber-400" : "ph-bold ph-flashlight";
-      } catch(e) {
-        showToast("端末がライト切り替えに対応していません", "warn");
-      }
-    }
-
-    function manualCodePrompt() {
-      const code = prompt("バーコード下の数字(JANコード13桁)を入力してください:");
-      if (code && code.trim()) {
-        onScanSuccess(code.trim());
-      }
-    }
-
-    // Lookup JAN from Custom Learned Dict first, then Built-in
-    async function resolveJanData(janCode) {
-      const learned = await db.customDict.get(janCode);
-      if (learned) return { ...learned, isLearned: true };
-      if (BUILTIN_JAN_CATALOG[janCode]) return { ...BUILTIN_JAN_CATALOG[janCode], isBuiltin: true };
       return null;
     }
 
-    async function onScanSuccess(decodedText) {
-      const now = Date.now();
-      const janCode = decodedText.trim();
+    // --- 3. View Routing ---
+    function switchTab(tab) {
+      ["inventory", "shopping", "recipes", "settings"].forEach(t => {
+        document.getElementById(`view-${t}`).classList.add("hidden");
+        const btn = document.getElementById(`nav-${t}`);
+        btn.classList.remove("text-indigo-600", "font-bold");
+        btn.classList.add("text-slate-400");
+      });
 
-      // Debounce consecutive scans of the same barcode within 2 seconds
-      if (janCode === lastScannedCode && (now - lastScannedTime) < 2000) {
-        return;
-      }
-      lastScannedCode = janCode;
-      lastScannedTime = now;
+      document.getElementById(`view-${tab}`).classList.remove("hidden");
+      const activeBtn = document.getElementById(`nav-${tab}`);
+      activeBtn.classList.add("text-indigo-600", "font-bold");
+      activeBtn.classList.remove("text-slate-400");
 
-      // 1. Check if inventory item already exists
-      const existing = await db.paints.where('jan').equals(janCode).first();
-
-      if (isBatchScanMode) {
-        // --- BATCH SCAN MODE LOGIC ---
-        if (existing) {
-          existing.count += 1;
-          existing.updatedAt = new Date().toISOString();
-          await db.paints.put(existing);
-          playBeep('success');
-          batchScanCount++;
-          document.getElementById('batchCountNum').innerText = batchScanCount;
-          showToast(`【+1本加算】${existing.productCode} ${existing.name} (計 ${existing.count}本)`, "success");
-        } else {
-          // Check dictionary
-          const dictData = await resolveJanData(janCode);
-          if (dictData) {
-            await db.paints.add({
-              jan: janCode,
-              maker: dictData.maker,
-              productCode: dictData.productCode,
-              name: dictData.name,
-              type: dictData.type,
-              count: 1,
-              updatedAt: new Date().toISOString()
-            });
-            playBeep('success');
-            batchScanCount++;
-            document.getElementById('batchCountNum').innerText = batchScanCount;
-            showToast(`【新規登録】${dictData.productCode} ${dictData.name} を追加`, "success");
-          } else {
-            // Unknown JAN: pause batch scan and open register modal for learning
-            playBeep('duplicate');
-            closeScannerModal();
-            showToast(`辞書にない未知のJANコードです (${janCode})。登録してください`, "warn");
-            openRegisterModal({ jan: janCode, count: 1 });
-          }
-        }
-      } else {
-        // --- SINGLE SCAN MODE LOGIC ---
-        closeScannerModal();
-        if (existing) {
-          playBeep('duplicate');
-          showToast(`【重複アラート】既に「${existing.productCode} ${existing.name}」を ${existing.count}本 所持しています！`, "warn");
-          document.getElementById('searchInput').value = existing.productCode;
-          switchView('inventory');
-        } else {
-          playBeep('success');
-          const dictData = await resolveJanData(janCode);
-          let initialForm = { jan: janCode, count: 1, maker: "GSIクレオス", type: "ラッカー", productCode: "", name: "" };
-          if (dictData) {
-            initialForm = { ...initialForm, ...dictData };
-            showToast(`辞書より「${dictData.productCode} ${dictData.name}」を取得しました`, "success");
-          } else {
-            showToast(`JANコード読み取り成功。塗料名を入力して登録してください`, "success");
-          }
-          openRegisterModal(initialForm);
-        }
-      }
+      if (tab === "inventory") renderInventory();
+      if (tab === "shopping") renderShopping();
+      if (tab === "recipes") renderRecipes();
     }
 
-    /* ========================================================
-       5. Paint Registration, Duplication Alert & Custom JAN Learning
-       ======================================================== */
-    function openRegisterModal(preload = null) {
-      document.getElementById('registerModal').classList.remove('hidden');
-      document.getElementById('registerModal').classList.add('flex');
-      document.getElementById('duplicateAlert').classList.add('hidden');
-
-      if (preload && preload.id) {
-        document.getElementById('registerModalTitle').innerText = "塗料情報の編集";
-        document.getElementById('formPaintId').value = preload.id;
-        document.getElementById('formMaker').value = preload.maker;
-        document.getElementById('formType').value = preload.type;
-        document.getElementById('formProductCode').value = preload.productCode;
-        document.getElementById('formName').value = preload.name;
-        document.getElementById('formJan').value = preload.jan || '';
-        document.getElementById('formCount').value = preload.count;
-      } else {
-        document.getElementById('registerModalTitle').innerText = "塗料の登録";
-        document.getElementById('formPaintId').value = "";
-        document.getElementById('formMaker').value = (preload && preload.maker) || "GSIクレオス";
-        document.getElementById('formType').value = (preload && preload.type) || "ラッカー";
-        document.getElementById('formProductCode').value = (preload && preload.productCode) || "";
-        document.getElementById('formName').value = (preload && preload.name) || "";
-        document.getElementById('formJan').value = (preload && preload.jan) || "";
-        document.getElementById('formCount').value = (preload && preload.count !== undefined) ? preload.count : 1;
-      }
-    }
-
-    function closeRegisterModal() {
-      document.getElementById('registerModal').classList.add('hidden');
-      document.getElementById('registerModal').classList.remove('flex');
-      document.getElementById('paintForm').reset();
-    }
-
-    function adjustFormQty(delta) {
-      const input = document.getElementById('formCount');
-      let val = parseInt(input.value || 0, 10) + delta;
-      if (val < 0) val = 0;
-      input.value = val;
-    }
-
-    async function checkDuplicateRealtime() {
-      const id = document.getElementById('formPaintId').value;
-      const maker = document.getElementById('formMaker').value;
-      const code = document.getElementById('formProductCode').value.trim().toUpperCase();
-      const jan = document.getElementById('formJan').value.trim();
-
-      if (!code && !jan) {
-        document.getElementById('duplicateAlert').classList.add('hidden');
-        return;
-      }
-
-      let matches = [];
-      if (jan) matches = await db.paints.where('jan').equals(jan).toArray();
-      if (matches.length === 0 && code) {
-        matches = await db.paints.where('productCode').equalsIgnoreCase(code).filter(p => p.maker === maker).toArray();
-      }
-
-      if (id) matches = matches.filter(m => String(m.id) !== String(id));
-
-      if (matches.length > 0) {
-        const item = matches[0];
-        document.getElementById('duplicateAlertMsg').innerText = `「${item.maker} ${item.productCode} ${item.name}」が既に ${item.count}本 存在します。`;
-        document.getElementById('duplicateAlert').classList.remove('hidden');
-      } else {
-        document.getElementById('duplicateAlert').classList.add('hidden');
-      }
-    }
-
-    async function handleFormSubmit(e) {
-      e.preventDefault();
-      const id = document.getElementById('formPaintId').value;
-      const maker = document.getElementById('formMaker').value;
-      const type = document.getElementById('formType').value;
-      const productCode = document.getElementById('formProductCode').value.trim().toUpperCase();
-      const name = document.getElementById('formName').value.trim();
-      const jan = document.getElementById('formJan').value.trim();
-      const count = parseInt(document.getElementById('formCount').value, 10);
-      const saveToDict = document.getElementById('formSaveToDictCheck').checked;
-
-      const paintData = {
-        maker,
-        type,
-        productCode,
-        name,
-        jan,
-        count: isNaN(count) ? 1 : count,
-        updatedAt: new Date().toISOString()
-      };
-
-      try {
-        if (id) {
-          await db.paints.update(parseInt(id, 10), paintData);
-          showToast(`「${name}」の情報を更新しました`, "success");
-        } else {
-          await db.paints.add(paintData);
-          showToast(`「${name}」を登録しました (${paintData.count}本)`, "success");
-        }
-
-        // Custom Dictionary Learning
-        if (jan && saveToDict) {
-          await db.customDict.put({
-            jan,
-            maker,
-            productCode,
-            name,
-            type,
-            learnedAt: new Date().toISOString()
-          });
-        }
-
-        closeRegisterModal();
-        renderAllViews();
-      } catch (err) {
-        console.error("Save error", err);
-        showToast("保存に失敗しました", "error");
-      }
-    }
-
-    /* ========================================================
-       6. Inventory Rendering & Stock Updates
-       ======================================================== */
+    // --- 4. Inventory Rendering ---
     async function renderInventory() {
-      const searchKeyword = (document.getElementById('searchInput').value || "").trim().toLowerCase();
-      document.getElementById('clearSearchBtn').classList.toggle('hidden', searchKeyword === "");
-      const sortMode = document.getElementById('sortSelect').value;
-      const hideOutOfStock = document.getElementById('hideOutOfStockCheck').checked;
-
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const sort = document.getElementById("sortSelect").value;
       let items = await db.paints.toArray();
 
-      // Filters
-      if (currentFilterType !== 'ALL') items = items.filter(p => p.type === currentFilterType);
-      if (currentFilterMaker !== 'ALL') items = items.filter(p => p.maker === currentFilterMaker);
-      if (hideOutOfStock) items = items.filter(p => p.count > 0);
+      // Category filter
+      if (currentFilterCategory !== "ALL") {
+        items = items.filter(i => i.category === currentFilterCategory);
+      }
 
-      if (searchKeyword) {
-        items = items.filter(p => 
-          (p.productCode && p.productCode.toLowerCase().includes(searchKeyword)) ||
-          (p.name && p.name.toLowerCase().includes(searchKeyword)) ||
-          (p.maker && p.maker.toLowerCase().includes(searchKeyword)) ||
-          (p.jan && p.jan.includes(searchKeyword))
+      // Keyword search
+      if (q) {
+        items = items.filter(i => 
+          (i.name && i.name.toLowerCase().includes(q)) ||
+          (i.code && i.code.toLowerCase().includes(q)) ||
+          (i.jan && i.jan.includes(q)) ||
+          (i.location && i.location.toLowerCase().includes(q))
         );
       }
 
-      // Sort
+      // Sorting
       items.sort((a, b) => {
-        if (sortMode === 'code_asc') return (a.productCode || "").localeCompare(b.productCode || "", undefined, { numeric: true });
-        if (sortMode === 'code_desc') return (b.productCode || "").localeCompare(a.productCode || "", undefined, { numeric: true });
-        if (sortMode === 'count_asc') return a.count - b.count;
-        if (sortMode === 'count_desc') return b.count - a.count;
-        if (sortMode === 'updated_desc') return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+        if (sort === "code_asc") return (a.code || "").localeCompare(b.code || "");
+        if (sort === "count_desc") return b.count - a.count;
+        if (sort === "count_asc") return a.count - b.count;
+        if (sort === "updated_desc") return (b.updatedAt || 0) - (a.updatedAt || 0);
         return 0;
       });
 
-      const container = document.getElementById('paintCardsContainer');
-      const emptyState = document.getElementById('inventoryEmptyState');
+      document.getElementById("inventoryCount").textContent = `表示中: ${items.length} 点`;
 
+      const listEl = document.getElementById("paintsListContainer");
       if (items.length === 0) {
-        container.innerHTML = "";
-        emptyState.classList.remove('hidden');
-      } else {
-        emptyState.classList.add('hidden');
-        container.innerHTML = items.map(paint => buildPaintCardHtml(paint, false)).join('');
-      }
-
-      updateGlobalBadges();
-    }
-
-    function buildPaintCardHtml(paint, isWishlistView = false) {
-      let typeBadgeClass = "bg-slate-800 text-slate-300 border-slate-700";
-      if (paint.type === 'ラッカー') typeBadgeClass = "bg-blue-950 text-blue-300 border-blue-700/50";
-      else if (paint.type === '水性') typeBadgeClass = "bg-emerald-950 text-emerald-300 border-emerald-700/50";
-      else if (paint.type === 'エナメル') typeBadgeClass = "bg-amber-950 text-amber-300 border-amber-700/50";
-
-      const isOutOfStock = paint.count <= 0;
-
-      return `
-        <div class="p-3.5 rounded-2xl bg-slate-900 border ${isOutOfStock ? 'border-dashed border-rose-900/80 bg-rose-950/10' : 'border-slate-800'} flex items-center justify-between gap-3 shadow-sm hover:border-slate-700 transition">
-          
-          <div class="flex-1 min-w-0 cursor-pointer" onclick="openRegisterModal(${JSON.stringify(paint).replace(/"/g, '&quot;')})">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide border ${typeBadgeClass}">
-                ${paint.type}
-              </span>
-              <span class="text-[11px] font-medium text-slate-400 truncate">
-                ${paint.maker}
-              </span>
-              ${paint.jan ? `<span class="text-[10px] font-mono text-slate-500 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700/50">JAN:${paint.jan.slice(-4)}</span>` : ''}
-            </div>
-
-            <div class="mt-1 flex items-baseline gap-2">
-              <span class="text-sm font-extrabold text-sky-400 font-mono tracking-wider">${escapeHtml(paint.productCode)}</span>
-              <span class="text-xs font-semibold text-slate-200 truncate">${escapeHtml(paint.name)}</span>
-            </div>
-
-            ${isOutOfStock ? `
-              <div class="mt-1 text-[10px] font-bold text-rose-400 flex items-center gap-1">
-                <i class="ph-bold ph-warning"></i> 在庫切れ（補充候補）
-              </div>
-            ` : ''}
-          </div>
-
-          <!-- Quantity Stepper Controls -->
-          <div class="flex items-center gap-1.5 flex-shrink-0">
-            ${isWishlistView ? `
-              <button 
-                onclick="quickUpdateCount(${paint.id}, 1)" 
-                class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold active:scale-95 transition flex items-center gap-1">
-                <i class="ph-bold ph-bag"></i> 購入(+1)
-              </button>
-            ` : `
-              <button 
-                onclick="quickUpdateCount(${paint.id}, -1)" 
-                class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-90 border border-slate-700 flex items-center justify-center text-slate-200 text-sm font-bold transition">
-                -
-              </button>
-              
-              <div class="w-9 text-center">
-                <span class="text-sm font-extrabold ${isOutOfStock ? 'text-rose-400' : 'text-white'} font-mono leading-none">
-                  ${paint.count}
-                </span>
-                <span class="block text-[9px] text-slate-500 leading-tight">本</span>
-              </div>
-
-              <button 
-                onclick="quickUpdateCount(${paint.id}, 1)" 
-                class="w-8 h-8 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 active:scale-90 border border-sky-500/40 flex items-center justify-center text-sky-300 text-sm font-bold transition">
-                +
-              </button>
-            `}
-
-            <button 
-              onclick="deletePaint(${paint.id}, '${escapeHtml(paint.name)}')" 
-              class="p-2 text-slate-600 hover:text-rose-400 active:scale-90 transition">
-              <i class="ph-bold ph-trash text-sm"></i>
-            </button>
-          </div>
-
-        </div>
-      `;
-    }
-
-    async function quickUpdateCount(id, delta) {
-      const paint = await db.paints.get(id);
-      if (!paint) return;
-      const newCount = Math.max(0, (paint.count || 0) + delta);
-      await db.paints.update(id, { count: newCount, updatedAt: new Date().toISOString() });
-      if (delta > 0) playBeep('success');
-      renderAllViews();
-    }
-
-    async function deletePaint(id, name) {
-      if (window.confirm(`「${name}」を削除してもよろしいですか？`)) {
-        await db.paints.delete(id);
-        showToast(`「${name}」を削除しました`, "warn");
-        renderAllViews();
-      }
-    }
-
-    function setFilterType(type) {
-      currentFilterType = type;
-      document.querySelectorAll('.filter-type-btn').forEach(btn => {
-        btn.classList.remove('bg-sky-600', 'text-white');
-        btn.classList.add('bg-slate-900', 'text-slate-400');
-      });
-      const el = document.getElementById(`filter-type-${type}`);
-      if (el) {
-        el.classList.remove('bg-slate-900', 'text-slate-400');
-        el.classList.add('bg-sky-600', 'text-white');
-      }
-      renderInventory();
-    }
-
-    function setFilterMaker(maker) {
-      currentFilterMaker = currentFilterMaker === maker ? 'ALL' : maker;
-      document.querySelectorAll('.filter-maker-btn').forEach(btn => {
-        btn.classList.remove('bg-indigo-600', 'text-white');
-        btn.classList.add('bg-slate-900', 'text-slate-400');
-      });
-      const el = document.getElementById(`filter-maker-${currentFilterMaker}`);
-      if (el) {
-        el.classList.remove('bg-slate-900', 'text-slate-400');
-        el.classList.add('bg-indigo-600', 'text-white');
-      }
-      renderInventory();
-    }
-
-    function clearSearch() {
-      document.getElementById('searchInput').value = "";
-      renderInventory();
-    }
-
-    /* ========================================================
-       7. Wishlist (買い物リスト) Logic
-       ======================================================== */
-    async function renderWishlist() {
-      // Paints with stock 0
-      const wishItems = await db.paints.where('count').equals(0).toArray();
-      const container = document.getElementById('wishlistContainer');
-      const emptyState = document.getElementById('wishlistEmptyState');
-
-      if (wishItems.length === 0) {
-        container.innerHTML = "";
-        emptyState.classList.remove('hidden');
-      } else {
-        emptyState.classList.add('hidden');
-        container.innerHTML = wishItems.map(p => buildPaintCardHtml(p, true)).join('');
-      }
-
-      updateGlobalBadges();
-    }
-
-    /* ========================================================
-       8. Color Mixing Recipes (調色レシピ・制作ログ)
-       ======================================================== */
-    function openRecipeModal(existing = null) {
-      document.getElementById('recipeModal').classList.remove('hidden');
-      document.getElementById('recipeModal').classList.add('flex');
-
-      const ingredientsList = document.getElementById('recipeIngredientsList');
-      ingredientsList.innerHTML = "";
-
-      if (existing) {
-        document.getElementById('recipeModalTitle').innerText = "調色レシピの編集";
-        document.getElementById('recipeId').value = existing.id;
-        document.getElementById('recipeTitle').value = existing.title || "";
-        document.getElementById('recipeKit').value = existing.kit || "";
-        document.getElementById('recipeNotes').value = existing.notes || "";
-
-        if (existing.ingredients && existing.ingredients.length > 0) {
-          existing.ingredients.forEach(ing => addRecipeIngredientRow(ing.paintName, ing.ratio));
-        } else {
-          addRecipeIngredientRow();
-        }
-      } else {
-        document.getElementById('recipeModalTitle').innerText = "調色レシピの作成";
-        document.getElementById('recipeId').value = "";
-        document.getElementById('recipeForm').reset();
-        addRecipeIngredientRow();
-        addRecipeIngredientRow();
-      }
-    }
-
-    function closeRecipeModal() {
-      document.getElementById('recipeModal').classList.add('hidden');
-      document.getElementById('recipeModal').classList.remove('flex');
-    }
-
-    function addRecipeIngredientRow(defaultName = "", defaultRatio = "") {
-      const container = document.getElementById('recipeIngredientsList');
-      const div = document.createElement('div');
-      div.className = "flex items-center gap-2 ingredient-row";
-      div.innerHTML = `
-        <input type="text" placeholder="塗料名 (例: C1 ホワイト)" value="${escapeHtml(defaultName)}" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white ing-name focus:ring-1 focus:ring-indigo-500">
-        <input type="text" placeholder="割合 (例: 70% / 5滴)" value="${escapeHtml(defaultRatio)}" class="w-28 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white ing-ratio focus:ring-1 focus:ring-indigo-500 font-mono">
-        <button type="button" onclick="this.parentElement.remove()" class="p-1.5 text-slate-500 hover:text-rose-400">
-          <i class="ph-bold ph-minus-circle text-base"></i>
-        </button>
-      `;
-      container.appendChild(div);
-    }
-
-    async function handleRecipeSubmit(e) {
-      e.preventDefault();
-      const id = document.getElementById('recipeId').value;
-      const title = document.getElementById('recipeTitle').value.trim();
-      const kit = document.getElementById('recipeKit').value.trim();
-      const notes = document.getElementById('recipeNotes').value.trim();
-
-      const ingredientRows = document.querySelectorAll('.ingredient-row');
-      const ingredients = [];
-      ingredientRows.forEach(row => {
-        const name = row.querySelector('.ing-name').value.trim();
-        const ratio = row.querySelector('.ing-ratio').value.trim();
-        if (name) ingredients.push({ paintName: name, ratio: ratio || "適量" });
-      });
-
-      const recipeData = {
-        title,
-        kit,
-        notes,
-        ingredients,
-        updatedAt: new Date().toISOString()
-      };
-
-      if (id) {
-        await db.recipes.update(parseInt(id, 10), recipeData);
-        showToast("レシピを更新しました", "success");
-      } else {
-        await db.recipes.add(recipeData);
-        showToast("新規レシピを作成しました", "success");
-      }
-
-      closeRecipeModal();
-      renderRecipes();
-    }
-
-    async function renderRecipes() {
-      const recipes = await db.recipes.orderBy('updatedAt').reverse().toArray();
-      const container = document.getElementById('recipesContainer');
-      const emptyState = document.getElementById('recipesEmptyState');
-
-      if (recipes.length === 0) {
-        container.innerHTML = "";
-        emptyState.classList.remove('hidden');
+        listEl.innerHTML = `
+          <div class="text-center py-12 text-slate-400 text-xs">
+            <i class="fa-solid fa-box-open text-3xl mb-2 block text-slate-300"></i>
+            該当する塗料がありません
+          </div>`;
         return;
       }
 
-      emptyState.classList.add('hidden');
-      container.innerHTML = recipes.map(r => `
-        <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <h3 class="text-sm font-bold text-indigo-300">${escapeHtml(r.title)}</h3>
-              ${r.kit ? `<p class="text-[11px] text-slate-400 mt-0.5"><i class="ph-bold ph-tag text-slate-500"></i> ${escapeHtml(r.kit)}</p>` : ''}
+      listEl.innerHTML = items.map(item => `
+        <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+          <div class="flex-1 min-w-0 pr-3">
+            <div class="flex items-center space-x-1.5 mb-0.5">
+              ${item.code ? `<span class="bg-slate-900 text-white font-mono text-[10px] font-bold px-1.5 py-0.5 rounded">${escapeHtml(item.code)}</span>` : ''}
+              <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ${getCategoryBadgeStyle(item.category)}">${item.category || 'その他'}</span>
+              <span class="text-[10px] text-slate-400">${item.maker || ''}</span>
             </div>
-            <div class="flex items-center gap-1">
-              <button onclick="openRecipeModal(${JSON.stringify(r).replace(/"/g, '&quot;')})" class="p-1.5 text-slate-400 hover:text-indigo-400 transition">
-                <i class="ph-bold ph-pencil-simple text-sm"></i>
-              </button>
-              <button onclick="deleteRecipe(${r.id}, '${escapeHtml(r.title)}')" class="p-1.5 text-slate-400 hover:text-rose-400 transition">
-                <i class="ph-bold ph-trash text-sm"></i>
-              </button>
-            </div>
+            <div class="font-bold text-sm text-slate-800 truncate">${escapeHtml(item.name)}</div>
+            ${item.location ? `<div class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>${escapeHtml(item.location)}</div>` : ''}
           </div>
 
-          <!-- Ingredients Chips -->
-          <div class="flex flex-wrap gap-1.5 pt-1">
-            ${(r.ingredients || []).map(ing => `
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 text-[11px] border border-slate-700">
-                <span class="text-slate-200 font-medium">${escapeHtml(ing.paintName)}</span>
-                <span class="text-indigo-400 font-mono font-bold">${escapeHtml(ing.ratio)}</span>
-              </span>
-            `).join('')}
+          <div class="flex items-center space-x-2">
+            <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-0.5">
+              <button onclick="updateCount(${item.id}, -1)" class="w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 flex items-center justify-center font-bold text-xs">-</button>
+              <span class="w-7 text-center text-xs font-bold ${item.count === 0 ? 'text-rose-600' : 'text-slate-800'}">${item.count}</span>
+              <button onclick="updateCount(${item.id}, 1)" class="w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 flex items-center justify-center font-bold text-xs">+</button>
+            </div>
+            <button onclick="editPaint(${item.id})" class="text-slate-300 hover:text-slate-500 p-1.5">
+              <i class="fa-solid fa-pen-to-square text-xs"></i>
+            </button>
           </div>
-
-          ${r.notes ? `
-            <p class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80 leading-relaxed font-mono">
-              ${escapeHtml(r.notes)}
-            </p>
-          ` : ''}
         </div>
-      `).join('');
+      `).join("");
+
+      updateShoppingBadge();
     }
 
-    async function deleteRecipe(id, title) {
-      if (window.confirm(`調色レシピ「${title}」を削除しますか？`)) {
+    function setFilterCategory(cat) {
+      currentFilterCategory = cat;
+      document.querySelectorAll(".cat-chip").forEach(el => {
+        el.classList.remove("bg-indigo-600", "text-white", "shadow-sm");
+        el.classList.add("bg-slate-100", "text-slate-600");
+      });
+      event.target.classList.add("bg-indigo-600", "text-white", "shadow-sm");
+      event.target.classList.remove("bg-slate-100", "text-slate-600");
+      renderInventory();
+    }
+
+    function getCategoryBadgeStyle(cat) {
+      if (cat === "ラッカー") return "bg-sky-50 text-sky-700 border border-sky-200";
+      if (cat === "水性") return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+      if (cat === "エナメル") return "bg-amber-50 text-amber-700 border border-amber-200";
+      if (cat === "サフ") return "bg-zinc-100 text-zinc-700 border border-zinc-200";
+      return "bg-slate-100 text-slate-600";
+    }
+
+    async function updateCount(id, delta) {
+      const item = await db.paints.get(id);
+      if (!item) return;
+      const newCount = Math.max(0, item.count + delta);
+      await db.paints.update(id, { count: newCount, updatedAt: Date.now() });
+      renderInventory();
+      if (document.getElementById("view-shopping").classList.contains("hidden") === false) {
+        renderShopping();
+      }
+    }
+
+    async function updateShoppingBadge() {
+      const outOfStockCount = await db.paints.where("count").equals(0).count();
+      const badge = document.getElementById("badge-shopping");
+      if (outOfStockCount > 0) {
+        badge.textContent = outOfStockCount;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    // --- 5. Shopping List Rendering ---
+    async function renderShopping() {
+      const items = await db.paints.where("count").equals(0).toArray();
+      const container = document.getElementById("shoppingListContainer");
+
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-400 text-xs">
+            <i class="fa-solid fa-check-circle text-3xl mb-2 block text-emerald-400"></i>
+            現在、補充が必要な塗料はありません
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(item => `
+        <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+          <div>
+            <div class="flex items-center space-x-1.5 mb-0.5">
+              ${item.code ? `<span class="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">${escapeHtml(item.code)}</span>` : ''}
+              <span class="text-[10px] text-slate-400">${item.maker || ''}</span>
+            </div>
+            <div class="font-bold text-sm text-slate-800">${escapeHtml(item.name)}</div>
+          </div>
+          <button onclick="updateCount(${item.id}, 1)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1 shadow-sm">
+            <i class="fa-solid fa-plus text-[10px]"></i>
+            <span>購入済 (+1)</span>
+          </button>
+        </div>
+      `).join("");
+    }
+
+    // --- 6. Barcode Scanner Logic ---
+    function openScanModal() {
+      document.getElementById("scanModal").classList.remove("hidden");
+      document.getElementById("lastScannedBox").classList.add("hidden");
+      document.getElementById("apiStatusBadge").textContent = yahooAppId ? "Yahoo!自動取得: ON" : "Yahoo!自動取得: 未設定";
+      startScanner();
+    }
+
+    function closeScanModal() {
+      stopScanner();
+      document.getElementById("scanModal").classList.add("hidden");
+      renderInventory();
+    }
+
+    function startScanner() {
+      if (isScanning) return;
+      html5QrCode = new Html5Qrcode("reader");
+      const config = {
+        fps: 15,
+        qrbox: { width: 250, height: 160 },
+        formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8 ]
+      };
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onBarcodeDetected,
+        (errorMessage) => {}
+      ).then(() => {
+        isScanning = true;
+      }).catch(err => {
+        alert("カメラ起動に失敗しました。Safariの設定でカメラ許可を確認してください。");
+        closeScanModal();
+      });
+    }
+
+    function stopScanner() {
+      if (html5QrCode && isScanning) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          isScanning = false;
+        }).catch(() => {});
+      }
+    }
+
+    async function onBarcodeDetected(decodedText) {
+      playBeep(920, 0.12);
+      
+      const isBatch = document.getElementById("batchScanToggle").checked;
+      
+      // 1. Search in local inventory
+      let existing = await db.paints.where("jan").equals(decodedText).first();
+      if (existing) {
+        existing.count += 1;
+        existing.updatedAt = Date.now();
+        await db.paints.put(existing);
+        showScannedFeedback(existing);
+        showToast(`「${existing.name}」の在庫を+1しました (計${existing.count}本)`);
+        if (!isBatch) closeScanModal();
+        return;
+      }
+
+      // 2. Search in custom learned dictionary
+      let dictEntry = await db.customDict.get(decodedText);
+
+      // 3. Query Yahoo! Shopping API if not found
+      if (!dictEntry && yahooAppId) {
+        dictEntry = await queryYahooPaint(decodedText);
+        if (dictEntry) {
+          await db.customDict.put(dictEntry); // Cache to custom dictionary
+        }
+      }
+
+      if (isBatch && dictEntry) {
+        // Automatically add if recognized
+        const newPaint = {
+          jan: decodedText,
+          maker: dictEntry.maker || "その他",
+          code: dictEntry.code || "",
+          name: dictEntry.name || "不明な塗料",
+          category: dictEntry.category || "その他",
+          count: 1,
+          location: "",
+          updatedAt: Date.now()
+        };
+        await db.paints.add(newPaint);
+        showScannedFeedback(newPaint);
+        showToast(`自動登録: ${newPaint.name} (+1本)`);
+      } else {
+        // Pause scanning and open manual form
+        stopScanner();
+        openManualModal({
+          jan: decodedText,
+          maker: dictEntry ? dictEntry.maker : "タミヤ",
+          code: dictEntry ? dictEntry.code : "",
+          name: dictEntry ? dictEntry.name : "",
+          category: dictEntry ? dictEntry.category : "ラッカー"
+        });
+      }
+    }
+
+    function showScannedFeedback(item) {
+      const box = document.getElementById("lastScannedBox");
+      document.getElementById("scanResultTitle").textContent = item.name;
+      document.getElementById("scanResultCount").textContent = `所持: ${item.count}本`;
+      document.getElementById("scanResultMeta").textContent = `${item.code || '-'} / ${item.maker} / ${item.category}`;
+      box.classList.remove("hidden");
+    }
+
+    // --- 7. Manual Add / Edit Modal ---
+    function openManualModal(preset = {}) {
+      document.getElementById("manualModal").classList.remove("hidden");
+      document.getElementById("form-id").value = preset.id || "";
+      document.getElementById("form-jan").value = preset.jan || "";
+      document.getElementById("form-maker").value = preset.maker || "タミヤ";
+      document.getElementById("form-category").value = preset.category || "ラッカー";
+      document.getElementById("form-code").value = preset.code || "";
+      document.getElementById("form-name").value = preset.name || "";
+      document.getElementById("form-count").value = preset.count !== undefined ? preset.count : 1;
+      document.getElementById("form-location").value = preset.location || "";
+      document.getElementById("duplicateAlert").classList.add("hidden");
+
+      if (preset.jan) checkDuplicateJan();
+    }
+
+    function closeManualModal() {
+      document.getElementById("manualModal").classList.add("hidden");
+    }
+
+    async function checkDuplicateJan() {
+      const jan = document.getElementById("form-jan").value.trim();
+      const currentId = document.getElementById("form-id").value;
+      if (!jan) {
+        document.getElementById("duplicateAlert").classList.add("hidden");
+        return;
+      }
+
+      const match = await db.paints.where("jan").equals(jan).first();
+      if (match && (!currentId || match.id !== Number(currentId))) {
+        document.getElementById("duplicateAlert").classList.remove("hidden");
+        document.getElementById("duplicateAlertText").innerHTML = `
+          <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+          すでに登録済: 「${escapeHtml(match.name)}」(所持: ${match.count}本)
+        `;
+      } else {
+        document.getElementById("duplicateAlert").classList.add("hidden");
+      }
+    }
+
+    async function triggerYahooSearchFromInput() {
+      const jan = document.getElementById("form-jan").value.trim();
+      if (!jan) return alert("JANコードを入力してください");
+      if (!yahooAppId) return alert("「設定」タブでYahoo! Client IDを保存してください");
+
+      showToast("Yahoo! APIに問い合わせ中...");
+      const res = await queryYahooPaint(jan);
+      if (res) {
+        document.getElementById("form-name").value = res.name;
+        document.getElementById("form-maker").value = res.maker;
+        document.getElementById("form-category").value = res.category;
+        if (res.code) document.getElementById("form-code").value = res.code;
+        showToast("商品情報を自動入力しました！");
+      } else {
+        showToast("該当する商品が見つかりませんでした");
+      }
+    }
+
+    function adjustFormCount(delta) {
+      const el = document.getElementById("form-count");
+      el.value = Math.max(0, parseInt(el.value || 0) + delta);
+    }
+
+    async function handleSavePaint(e) {
+      e.preventDefault();
+      const id = document.getElementById("form-id").value;
+      const jan = document.getElementById("form-jan").value.trim();
+      const maker = document.getElementById("form-maker").value;
+      const category = document.getElementById("form-category").value;
+      const code = document.getElementById("form-code").value.trim();
+      const name = document.getElementById("form-name").value.trim();
+      const count = parseInt(document.getElementById("form-count").value || 0);
+      const location = document.getElementById("form-location").value.trim();
+
+      const payload = {
+        jan, maker, category, code, name, count, location, updatedAt: Date.now()
+      };
+
+      if (id) {
+        await db.paints.update(Number(id), payload);
+        showToast("塗料情報を更新しました");
+      } else {
+        await db.paints.add(payload);
+        showToast("塗料を新規登録しました");
+      }
+
+      // Learn into custom dictionary if JAN is present
+      if (jan && name) {
+        await db.customDict.put({ jan, maker, code, name, category });
+      }
+
+      closeManualModal();
+      renderInventory();
+    }
+
+    async function editPaint(id) {
+      const item = await db.paints.get(id);
+      if (item) openManualModal(item);
+    }
+
+    // --- 8. Recipe Management ---
+    function openRecipeModal() {
+      document.getElementById("recipeModal").classList.remove("hidden");
+    }
+    function closeRecipeModal() {
+      document.getElementById("recipeModal").classList.add("hidden");
+    }
+
+    async function handleSaveRecipe(e) {
+      e.preventDefault();
+      const kit = document.getElementById("recipe-kit").value.trim();
+      const formula = document.getElementById("recipe-formula").value.trim();
+      const note = document.getElementById("recipe-note").value.trim();
+
+      await db.recipes.add({ kit, formula, note, createdAt: Date.now() });
+      document.getElementById("recipeForm").reset();
+      closeRecipeModal();
+      renderRecipes();
+      showToast("レシピを保存しました");
+    }
+
+    async function renderRecipes() {
+      const list = await db.recipes.reverse().toArray();
+      const container = document.getElementById("recipesContainer");
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-400 text-xs">
+            <i class="fa-solid fa-palette text-3xl mb-2 block text-slate-300"></i>
+            登録されたレシピはありません
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(r => `
+        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 space-y-1.5">
+          <div class="flex justify-between items-start">
+            <div class="font-bold text-sm text-slate-900">${escapeHtml(r.kit)}</div>
+            <button onclick="deleteRecipe(${r.id})" class="text-slate-300 hover:text-rose-500 p-1">
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+          </div>
+          <pre class="text-xs bg-slate-50 p-2 rounded-xl text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">${escapeHtml(r.formula)}</pre>
+          ${r.note ? `<div class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info mr-1"></i>${escapeHtml(r.note)}</div>` : ''}
+        </div>
+      `).join("");
+    }
+
+    async function deleteRecipe(id) {
+      if (confirm("このレシピを削除しますか？")) {
         await db.recipes.delete(id);
-        showToast("レシピを削除しました", "warn");
         renderRecipes();
       }
     }
 
-    /* ========================================================
-       9. Settings, Custom Dictionary & Full Backup
-       ======================================================== */
-    async function renderSettings() {
-      const customItems = await db.customDict.toArray();
-      document.getElementById('customDictCountBadge').innerText = `${customItems.length}件`;
-      
-      const preview = document.getElementById('customDictListPreview');
-      if (customItems.length === 0) {
-        preview.innerHTML = `<p class="text-[11px] text-slate-500 italic py-2">未登録バーコードをスキャンして登録すると、ここに自動学習されます。</p>`;
-      } else {
-        preview.innerHTML = customItems.map(d => `
-          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-800 text-[11px]">
-            <div>
-              <span class="font-mono text-sky-400 font-bold">${escapeHtml(d.productCode)}</span>
-              <span class="text-slate-300 ml-1.5">${escapeHtml(d.name)}</span>
-              <span class="text-slate-500 font-mono ml-1">(${d.jan})</span>
-            </div>
-            <button onclick="removeLearnedJan('${d.jan}')" class="text-slate-500 hover:text-rose-400 p-1">
-              <i class="ph-bold ph-x"></i>
-            </button>
-          </div>
-        `).join('');
-      }
+    // --- 9. Settings, Backup & Yahoo ID ---
+    function saveYahooAppId() {
+      const val = document.getElementById("yahooAppIdInput").value.trim();
+      yahooAppId = val;
+      localStorage.setItem("YAHOO_APP_ID", val);
+      showToast("Yahoo! Client IDを保存しました");
     }
 
-    async function removeLearnedJan(jan) {
-      await db.customDict.delete(jan);
-      showToast("カスタム辞書項目を削除しました", "warn");
-      renderSettings();
-    }
-
-    async function exportAllDataJSON() {
+    async function exportDataJSON() {
       const paints = await db.paints.toArray();
-      const customDict = await db.customDict.toArray();
       const recipes = await db.recipes.toArray();
-
-      const bundle = {
-        app: "PaintBoxPro",
-        version: "2.0",
-        exportedAt: new Date().toISOString(),
-        paints,
-        customDict,
-        recipes
-      };
-
-      const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bundle, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", jsonStr);
-      downloadAnchor.setAttribute("download", `paintbox_backup_${new Date().toISOString().slice(0, 10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-
-      showToast("全データのJSONバックアップを出力しました！", "success");
+      const dict = await db.customDict.toArray();
+      const blob = new Blob([JSON.stringify({ paints, recipes, dict }, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `paints_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
-    function importAllDataJSON(event) {
+    async function importDataJSON(event) {
       const file = event.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
-      reader.onload = async function(e) {
+      reader.onload = async (e) => {
         try {
-          const parsed = JSON.parse(e.target.result);
-          
-          let paintList = Array.isArray(parsed) ? parsed : (parsed.paints || []);
-          let dictList = parsed.customDict || [];
-          let recipeList = parsed.recipes || [];
-
-          for (const item of paintList) {
-            delete item.id;
-            await db.paints.add(item);
-          }
-          for (const dict of dictList) {
-            await db.customDict.put(dict);
-          }
-          for (const rec of recipeList) {
-            delete rec.id;
-            await db.recipes.add(rec);
-          }
-
-          showToast(`塗料 ${paintList.length}件、レシピ ${recipeList.length}件を復元しました`, "success");
-          renderAllViews();
+          const data = JSON.parse(e.target.result);
+          if (data.paints) await db.paints.bulkPut(data.paints);
+          if (data.recipes) await db.recipes.bulkPut(data.recipes);
+          if (data.dict) await db.customDict.bulkPut(data.dict);
+          renderInventory();
+          showToast("データを復元・統合しました");
         } catch (err) {
-          console.error("Import error", err);
-          showToast("JSONファイルの復元に失敗しました", "error");
+          alert("JSONの読み込みに失敗しました");
         }
       };
       reader.readAsText(file);
     }
 
-    async function seedSampleData() {
-      const samplePaints = [
-        { maker: "GSIクレオス", type: "ラッカー", productCode: "C1", name: "ホワイト (光沢)", jan: "4973028531008", count: 2, updatedAt: new Date().toISOString() },
-        { maker: "GSIクレオス", type: "ラッカー", productCode: "C2", name: "ブラック (光沢)", jan: "4973028531015", count: 1, updatedAt: new Date().toISOString() },
-        { maker: "GSIクレオス", type: "ラッカー", productCode: "C13", name: "ニュートラルグレー", jan: "4973028531121", count: 0, updatedAt: new Date().toISOString() },
-        { maker: "ガイアノーツ", type: "ラッカー", productCode: "001", name: "アルティメットホワイト", jan: "4571180810017", count: 1, updatedAt: new Date().toISOString() },
-        { maker: "ガイアノーツ", type: "ラッカー", productCode: "002", name: "ピュアブラック", jan: "4571180810024", count: 0, updatedAt: new Date().toISOString() },
-        { maker: "タミヤ", type: "エナメル", productCode: "XF-1", name: "フラットブラック", jan: "4950344817016", count: 3, updatedAt: new Date().toISOString() }
+    async function seedTamiyaDemo() {
+      const samples = [
+        { jan: "4950344813018", maker: "タミヤ", code: "LP-1", name: "ブラック", category: "ラッカー", count: 2, location: "ラック最上段", updatedAt: Date.now() },
+        { jan: "4950344813025", maker: "タミヤ", code: "LP-2", name: "ホワイト", category: "ラッカー", count: 1, location: "ラック最上段", updatedAt: Date.now() },
+        { jan: "4950344813032", maker: "タミヤ", code: "LP-3", name: "フラットブラック", category: "ラッカー", count: 0, location: "", updatedAt: Date.now() },
+        { jan: "4950344813117", maker: "タミヤ", code: "LP-11", name: "シルバー", category: "ラッカー", count: 1, location: "机引き出し", updatedAt: Date.now() },
+        { jan: "4950344813278", maker: "タミヤ", code: "LP-27", name: "ジャーマングレイ", category: "ラッカー", count: 0, location: "", updatedAt: Date.now() }
       ];
-
-      for (const p of samplePaints) {
-        const exist = await db.paints.where('productCode').equalsIgnoreCase(p.productCode).filter(i => i.maker === p.maker).first();
-        if (!exist) await db.paints.add(p);
-      }
-
-      // Sample Recipe
-      const sampleRecipe = {
-        title: "量産型ザクII 装甲グリーン",
-        kit: "MG MS-06F ザクII",
-        notes: "下地：ガイアEVOブラック。希釈比率は塗料1：溶剤1.3",
-        ingredients: [
-          { paintName: "C13 ニュートラルグレー", ratio: "40%" },
-          { paintName: "C5 ブルー", ratio: "15%" },
-          { paintName: "C4 イエロー", ratio: "45%" }
-        ],
-        updatedAt: new Date().toISOString()
-      };
-      await db.recipes.add(sampleRecipe);
-
-      showToast("サンプル塗料と調色レシピを投入しました！", "success");
-      renderAllViews();
+      await db.paints.bulkPut(samples);
+      renderInventory();
+      showToast("サンプル5件を登録しました");
     }
 
     async function clearAllData() {
-      if (window.confirm("すべての塗料、買い物リスト、レシピ、学習辞書を完全に削除しますか？\n（この操作は取り消せません）")) {
+      if (confirm("すべての在庫・レシピ・辞書データを削除しますか？")) {
         await db.paints.clear();
-        await db.customDict.clear();
         await db.recipes.clear();
-        showToast("すべてのデータを初期化しました", "warn");
-        renderAllViews();
+        await db.customDict.clear();
+        renderInventory();
+        showToast("データをすべて消去しました");
       }
-    }
-
-    async function updateGlobalBadges() {
-      const totalStockSum = await db.paints.where('count').above(0).count();
-      const wishlistCount = await db.paints.where('count').equals(0).count();
-
-      document.getElementById('headerTotalStock').innerText = totalStockSum;
-      document.getElementById('headerWishlistBadge').innerText = wishlistCount;
-
-      const navDot = document.getElementById('navWishlistDot');
-      if (navDot) navDot.classList.toggle('hidden', wishlistCount === 0);
-    }
-
-    function renderAllViews() {
-      renderInventory();
-      renderWishlist();
-      renderRecipes();
-      renderSettings();
-      updateGlobalBadges();
     }
 
     function escapeHtml(str) {
       if (!str) return "";
-      return String(str).replace(/[&<>"']/g, function(m) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-      });
+      return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
     }
 
-    /* ========================================================
-       10. App Boot
-       ======================================================== */
-    window.onload = function() {
-      renderAllViews();
-    };
+    // --- On Load ---
+    window.addEventListener("DOMContentLoaded", () => {
+      if (yahooAppId) {
+        document.getElementById("yahooAppIdInput").value = yahooAppId;
+      }
+      renderInventory();
+    });
   </script>
 </body>
 </html>
