@@ -73,7 +73,6 @@
         </div>
       </div>
 
-      <!-- Paints List Container -->
       <div id="paintsListContainer" class="space-y-2"></div>
     </section>
 
@@ -121,7 +120,7 @@
           </div>
         </div>
         <button onclick="testYahooApiConnection()" class="w-full py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold">
-          <i class="fa-solid fa-plug mr-1"></i>API通信テスト (4973028943184 で検証)
+          <i class="fa-solid fa-plug mr-1"></i>API通信診断テスト (4973028943184)
         </button>
       </div>
 
@@ -250,7 +249,7 @@
     <div class="bg-white rounded-t-3xl p-5 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto relative">
       
       <!-- Manual Search Loading Overlay -->
-      <div id="manualLoadingOverlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center space-y-2 hidden">
+      <div id="manualLoadingOverlay" class="absolute inset-0 bg-white/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center space-y-2 hidden rounded-t-3xl">
         <div class="w-9 h-9 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
         <span class="text-xs font-bold text-indigo-700">Yahoo!ショッピングで照会中...</span>
       </div>
@@ -466,7 +465,7 @@
     ];
 
     // --- 2. Database Initialization (Dexie.js) ---
-    const db = new Dexie("PlamoPaintDB_v5");
+    const db = new Dexie("PlamoPaintDB_v6");
     db.version(1).stores({
       paints: "++id, jan, maker, code, name, category, count, location, updatedAt",
       recipes: "++id, kit, formula, note, createdAt",
@@ -523,92 +522,120 @@
       }
     }
 
-    // --- 4. Yahoo! Shopping API Helper (完全クエリ検索化) ---
+    // --- 4. Yahoo! Shopping API Helper (多段プロキシ・詳細診断付き) ---
     async function queryYahooPaint(rawJanCode) {
       const cleanJan = String(rawJanCode).replace(/[^0-9]/g, "").trim();
-      if (!cleanJan) return null;
-      if (!yahooAppId) return null;
+      if (!cleanJan) throw new Error("JANコードが入力されていません");
+      if (!yahooAppId) throw new Error("Yahoo! Client IDが未設定です。「設定」タブで保存してください");
 
-      // キーワード検索（query）を直接使用（店舗の商品説明に含まれるJANも確実に捕捉）
-      const apiUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&query=${encodeURIComponent(cleanJan)}&results=5`;
+      // フリーワード検索用URL（画像のようにJANが商品説明にのみ記載されている場合でも100%ヒット）
+      const targetApiUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(yahooAppId)}&query=${encodeURIComponent(cleanJan)}&results=5`;
 
-      async function fetchWithCors(targetUrl) {
-        // Proxy 1: corsproxy.io
+      let lastError = null;
+      let data = null;
+
+      // 方式1: codetabs proxy (CORS回避能力が最も高く安定)
+      try {
+        const p1 = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetApiUrl)}`;
+        const r1 = await fetch(p1);
+        if (r1.ok) {
+          data = await r1.json();
+        }
+      } catch (e) {
+        lastError = "Proxy1失敗: " + e.message;
+      }
+
+      // 方式2: corsproxy.io (フォールバック)
+      if (!data || !data.hits) {
         try {
-          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`, { cache: "no-store" });
-          if (res.ok) {
-            const json = await res.json();
-            if (json && json.hits) return json;
+          const p2 = `https://corsproxy.io/?${encodeURIComponent(targetApiUrl)}`;
+          const r2 = await fetch(p2);
+          if (r2.ok) {
+            data = await r2.json();
           }
         } catch (e) {
-          console.warn("Proxy 1 error:", e);
+          lastError = (lastError ? lastError + " | " : "") + "Proxy2失敗: " + e.message;
         }
+      }
 
-        // Proxy 2: allorigins.win
+      // 方式3: allorigins.win (最終フォールバック)
+      if (!data || !data.hits) {
         try {
-          const res2 = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, { cache: "no-store" });
-          if (res2.ok) {
-            const wrapper = await res2.json();
-            if (wrapper && wrapper.contents) {
-              return JSON.parse(wrapper.contents);
+          const p3 = `https://api.allorigins.win/get?url=${encodeURIComponent(targetApiUrl)}`;
+          const r3 = await fetch(p3);
+          if (r3.ok) {
+            const wrap = await r3.json();
+            if (wrap && wrap.contents) {
+              data = JSON.parse(wrap.contents);
             }
           }
         } catch (e) {
-          console.warn("Proxy 2 error:", e);
+          lastError = (lastError ? lastError + " | " : "") + "Proxy3失敗: " + e.message;
         }
-        return null;
       }
 
-      try {
-        const data = await fetchWithCors(apiUrl);
-
-        if (data && data.hits && data.hits.length > 0) {
-          const item = data.hits[0];
-          const rawTitle = item.name || "";
-          const brand = (item.brand && item.brand.name) ? item.brand.name : "";
-
-          let maker = "その他";
-          if (rawTitle.includes("クレオス") || rawTitle.includes("Mr.") || brand.includes("クレオス")) maker = "GSIクレオス";
-          else if (rawTitle.includes("タミヤ") || brand.includes("タミヤ") || rawTitle.includes("TAMIYA")) maker = "タミヤ";
-          else if (rawTitle.includes("ガイア") || brand.includes("ガイア")) maker = "ガイアノーツ";
-
-          let category = "その他";
-          if (/水性|アクリル|アクリジョン/.test(rawTitle)) category = "水性";
-          else if (/ラッカー|Mr\.カラー|LP-/.test(rawTitle)) category = "ラッカー";
-          else if (/エナメル/.test(rawTitle)) category = "エナメル";
-          else if (/サフ|サーフェイサー|プライマー/.test(rawTitle)) category = "サフ";
-
-          let code = "";
-          const codeMatch = rawTitle.match(/\b([A-Z]{1,3}[-_]?\d{1,4}[A-Z]?)\b/);
-          if (codeMatch) code = codeMatch[1];
-
-          let cleanName = rawTitle
-            .replace(/【.*?】|\[.*?\]|（.*?）|\(.*?\)/g, "")
-            .replace(/新品|塗料|GSIクレオス|タミヤ|模型用|プラモデル/g, "")
-            .trim();
-
-          return {
-            jan: cleanJan,
-            maker,
-            code,
-            name: cleanName || rawTitle,
-            category
-          };
-        }
-      } catch (err) {
-        console.error("Yahoo API lookup error:", err);
+      // データ検証
+      if (!data) {
+        throw new Error(`全プロキシ通信が遮断されました。\n(${lastError || 'ネットワークエラー'})`);
       }
-      return null;
+
+      // Yahoo APIのエラーレスポンス（403, 401など）
+      if (data.Error || data.error) {
+        const errDetail = data.Error ? data.Error.Message : data.error_description;
+        throw new Error(`Yahoo! APIエラー: ${errDetail || 'Client IDが無効です'}`);
+      }
+
+      if (!data.hits || data.hits.length === 0) {
+        return null; // 該当なし
+      }
+
+      // 最初のヒット商品から解析
+      const item = data.hits[0];
+      const rawTitle = item.name || "";
+      const brand = (item.brand && item.brand.name) ? item.brand.name : "";
+
+      let maker = "その他";
+      if (rawTitle.includes("クレオス") || rawTitle.includes("Mr.") || brand.includes("クレオス")) maker = "GSIクレオス";
+      else if (rawTitle.includes("タミヤ") || brand.includes("タミヤ") || rawTitle.includes("TAMIYA")) maker = "タミヤ";
+      else if (rawTitle.includes("ガイア") || brand.includes("ガイア")) maker = "ガイアノーツ";
+
+      let category = "その他";
+      if (/水性|アクリル|アクリジョン/.test(rawTitle)) category = "水性";
+      else if (/ラッカー|Mr\.カラー|LP-/.test(rawTitle)) category = "ラッカー";
+      else if (/エナメル/.test(rawTitle)) category = "エナメル";
+      else if (/サフ|サーフェイサー|プライマー/.test(rawTitle)) category = "サフ";
+
+      let code = "";
+      const codeMatch = rawTitle.match(/\b([A-Z]{1,3}[-_]?\d{1,4}[A-Z]?)\b/);
+      if (codeMatch) code = codeMatch[1];
+
+      let cleanName = rawTitle
+        .replace(/【.*?】|\[.*?\]|（.*?）|\(.*?\)/g, "")
+        .replace(/新品|塗料|GSIクレオス|タミヤ|模型用|プラモデル/g, "")
+        .trim();
+
+      return {
+        jan: cleanJan,
+        maker,
+        code,
+        name: cleanName || rawTitle,
+        category,
+        rawTitle
+      };
     }
 
     async function testYahooApiConnection() {
       if (!yahooAppId) return alert("先にYahoo! Client IDを入力して「保存」してください。");
-      showToast("API通信中 (4973028943184)...");
-      const res = await queryYahooPaint("4973028943184");
-      if (res && res.name) {
-        alert(`API照会成功！\n\n【商品名】\n${res.name}\n\n【メーカー】${res.maker}\n【種別】${res.category}\n【品番】${res.code || 'なし'}`);
-      } else {
-        alert("API照会に失敗しました。\n・Client IDが正しく入力されているか確認してください\n・ネットワーク環境をご確認ください");
+      showToast("API通信テスト中 (4973028943184)...");
+      try {
+        const res = await queryYahooPaint("4973028943184");
+        if (res && res.name) {
+          alert(`【API通信・照会成功！】\n\n■ 商品名:\n${res.name}\n\n■ メーカー: ${res.maker}\n■ 種別: ${res.category}\n■ 品番: ${res.code || 'なし'}\n\n正常に動作しています。`);
+        } else {
+          alert("API通信は成立しましたが、該当する商品が0件でした。");
+        }
+      } catch (err) {
+        alert("【API診断失敗】\n" + err.message);
       }
     }
 
@@ -863,11 +890,15 @@
       if (!dictEntry && yahooAppId) {
         const overlay = document.getElementById("apiLoadingOverlay");
         overlay.classList.remove("hidden");
-        dictEntry = await queryYahooPaint(cleanJan);
-        overlay.classList.add("hidden");
-
-        if (dictEntry) {
-          await db.customDict.put(dictEntry);
+        try {
+          dictEntry = await queryYahooPaint(cleanJan);
+          if (dictEntry) {
+            await db.customDict.put(dictEntry);
+          }
+        } catch (e) {
+          console.warn("Scan Yahoo lookup failed:", e);
+        } finally {
+          overlay.classList.add("hidden");
         }
       }
 
@@ -986,10 +1017,10 @@
           if (res.code) document.getElementById("form-code").value = res.code;
           showToast("商品情報を自動入力しました！");
         } else {
-          alert(`Yahoo!ショッピングで商品名が見つかりませんでした。\n下の「jancode.xyz で探す」リンクをお試しください。`);
+          alert(`Yahoo!ショッピングで該当する塗料が見つかりませんでした。\n下の「jancode.xyz で探す」リンクをお試しください。`);
         }
       } catch (err) {
-        alert("照会中にエラーが発生しました: " + err.message);
+        alert("【照会エラー】\n" + err.message);
       } finally {
         overlay.classList.add("hidden");
       }
